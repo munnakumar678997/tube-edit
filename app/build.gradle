@@ -1,0 +1,29 @@
+apply plugin: 'com.android.application'
+
+android {
+    namespace "com.myapp.tubeedit"  
+    compileSdk 36
+
+    defaultConfig {
+        applicationId "com.myapp.tubeedit"
+        minSdkVersion 21
+        targetSdkVersion 36
+        versionCode 1
+        versionName "3.98"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+dependencies {
+    // Add your dependencies here
+    implementation 'androidx.webkit:webkit:1.12.0'
+}
+
+
+

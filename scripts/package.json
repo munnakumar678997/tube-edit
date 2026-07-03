@@ -1,0 +1,7 @@
+{
+  "name": "tube-edit",
+  "version": "3.9.80",
+  "description": "Personal WebView-based YouTube client with AdBlocker, Downloader, Background Player, PIP Mode, Google Gemini and more.",
+  "main": "script.js",
+  "license": "MIT"
+}
