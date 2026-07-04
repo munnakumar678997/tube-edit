@@ -712,32 +712,36 @@ column:50%;
 margin-right:2%;
 color:${c};
 }
-.ytproSettingsTabs{
+#ssprodivI div.ytproSettingsTabs{
 display:flex;
 gap:5px;
 width:calc(100% - 20px);
+height:auto;
 margin:10px auto;
+padding:5px 0 0 0;
 position:sticky;
 top:0;
 background:${isD ? "#212121" : "#f1f1f1"};
 z-index:5;
-padding-top:5px;
 }
-.ytproSettingsTabs div{
+#ssprodivI div.ytproSettingsTabs div{
 flex:1;
-text-align:center;
+height:auto;
 padding:8px 0;
+margin:0;
+text-align:center;
+justify-content:center;
 border-radius:20px;
 font-size:13px;
 background:transparent;
 color:${isD ? "#ccc" : "#444"};
 }
-.ytproSettingsTabs div.active{
+#ssprodivI div.ytproSettingsTabs div.active{
 background:${c};
 color:${dc};
 }
-.ytproSettingsPane{display:none;}
-.ytproSettingsPane.active{display:block;}
+#ssprodivI div.ytproSettingsPane{display:none;height:auto;}
+#ssprodivI div.ytproSettingsPane.active{display:block;}
 #ssprodivI .proxyRow{display:flex;gap:6px;width:calc(100% - 20px);margin:5px auto;}
 #ssprodivI .proxyRow input{flex:1;height:35px;border-radius:15px;border:0;padding:0 10px;background:${isD ? "rgba(255,255,255,.1)" : "rgba(0,0,0,.1)"};color:${isD ? "#fff" : "#000"};}
 </style>`;
