@@ -129,6 +129,31 @@ public class YTProWebViewClient extends WebViewClient {
 		}
 		
 		
+		if (url.contains("youtube.com/ytpro_cdn/npm/ytpro")) {
+			try {
+				String assetName;
+				if (url.contains("/bgplay.js")) assetName = "bgplay.js";
+				else if (url.contains("/innertube.js")) assetName = "innertube.js";
+				else assetName = "script.js";
+
+				Map<String, String> headers = new HashMap<>();
+				headers.put("Access-Control-Allow-Origin", "*");
+				headers.put("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+				headers.put("Access-Control-Allow-Headers", "*");
+				headers.put("Content-Type", "application/javascript");
+				headers.put("Cross-Origin-Resource-Policy", "cross-origin");
+
+				if (request.getMethod().equals("OPTIONS")) {
+					return new WebResourceResponse("text/plain", "UTF-8", 204, "No Content", headers, null);
+				}
+
+				InputStream assetStream = activity.getAssets().open(assetName);
+				return new WebResourceResponse("application/javascript", "utf-8", 200, "OK", headers, assetStream);
+			} catch (Exception e) {
+				Log.e("YTPRO_WVC", "Local asset load failed: " + e.getMessage());
+			}
+		}
+
 		if (url.contains("youtube.com/ytpro_cdn/")) {
 			String modifiedUrl = url;
 			if (url.contains("youtube.com/ytpro_cdn/esm")) modifiedUrl = url.replace("youtube.com/ytpro_cdn/esm", "esm.sh");
