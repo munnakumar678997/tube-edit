@@ -559,7 +559,7 @@ var el=e.target.closest("[data-url]");
 if(!el) return;
 
 Android.downvid(el.dataset.title,el.dataset.url,"image/jpg");
-window.ytproRecordDownload?.(safeTitle, el.dataset.title, "thumbnail");
+window.ytproRecordDownload?.(safeTitle, el.dataset.title, "thumbnail", el.dataset.url, info.basic_info.duration || 0, videoId);
 
 });
 }
@@ -600,7 +600,7 @@ var el=e.target.closest("[data-url]");
 if(!el) return;
 
 Android.downvid(el.dataset.title+el.dataset.ext,el.dataset.url,"plain/text");
-window.ytproRecordDownload?.(safeTitle, el.dataset.title+el.dataset.ext, "caption");
+window.ytproRecordDownload?.(safeTitle, el.dataset.title+el.dataset.ext, "caption", info.basic_info.thumbnail?.[info.basic_info.thumbnail.length-1]?.url, info.basic_info.duration || 0, videoId);
 
 });
 
@@ -685,7 +685,7 @@ var best = thumbs?.[thumbs.length-1];
 if(!best){ window.Android?.showToast?.('No thumbnail found.'); return; }
 var thumbFileName = `${safeTitle} YTPRO.jpg`;
 Android.downvid(thumbFileName, best.url, "image/jpg");
-window.ytproRecordDownload?.(safeTitle, thumbFileName, "thumbnail");
+window.ytproRecordDownload?.(safeTitle, thumbFileName, "thumbnail", best.url, info.basic_info.duration || 0, videoId);
 return;
 }
 
@@ -701,7 +701,7 @@ if(url){
 var ext = (f.mimeType||"").includes("webm") ? "webm" : "mp4";
 var videoFileName = `${safeTitle}_${new Date().getTime()}.${ext}`;
 Android.downvid(videoFileName, url, f.mimeType || "video/mp4");
-window.ytproRecordDownload?.(safeTitle, videoFileName, "video");
+window.ytproRecordDownload?.(safeTitle, videoFileName, "video", info.basic_info.thumbnail?.[info.basic_info.thumbnail.length-1]?.url, info.basic_info.duration || 0, videoId);
 return;
 }
 }
@@ -718,7 +718,7 @@ if(url){
 var ext = (f.mimeType||"").includes("webm") ? "weba" : "m4a";
 var audioFileName2 = `${safeTitle}_audio_${new Date().getTime()}.${ext}`;
 Android.downvid(audioFileName2, url, f.mimeType || "audio/mp4");
-window.ytproRecordDownload?.(safeTitle, audioFileName2, "audio");
+window.ytproRecordDownload?.(safeTitle, audioFileName2, "audio", info.basic_info.thumbnail?.[info.basic_info.thumbnail.length-1]?.url, info.basic_info.duration || 0, videoId);
 return;
 }
 }
@@ -906,7 +906,7 @@ var {elDetails,elProgress} = createProgreses("Video Stream");
 
 await pipeToDisk(videoStream,fileName, estVideoBytes,elDetails,elProgress);
 
-window.ytproRecordDownload?.(safeTitle, fileName, "video");
+window.ytproRecordDownload?.(safeTitle, fileName, "video", info.basic_info.thumbnail?.[info.basic_info.thumbnail.length-1]?.url, durationSec, videoId);
 finishDownloaderUI('Video download complete');
 
 }else if(enabledTrack==EnabledTrackTypes.AUDIO_ONLY){
@@ -926,7 +926,7 @@ var fileName=`${safeTitle}_audio${new Date().getTime()}.${containerExt}`;
 
 await pipeToDisk(audioStream,fileName, estAudioBytes,elDetails,elProgress);
 
-window.ytproRecordDownload?.(safeTitle, fileName, "audio");
+window.ytproRecordDownload?.(safeTitle, fileName, "audio", info.basic_info.thumbnail?.[info.basic_info.thumbnail.length-1]?.url, durationSec, videoId);
 finishDownloaderUI('Audio download complete');
 
 }else if(enabledTrack==EnabledTrackTypes.VIDEO_AND_AUDIO){
@@ -971,7 +971,7 @@ window.Android.showToast('Muxing formats...');
 
 var muxedOutputFileName = `${safeTitle}_${new Date().getTime()}.${containerExt}`;
 window.Android?.muxVideoAudio?.(videoFileName,audioFileName,muxedOutputFileName);
-window.ytproRecordDownload?.(safeTitle, muxedOutputFileName, "video");
+window.ytproRecordDownload?.(safeTitle, muxedOutputFileName, "video", info.basic_info.thumbnail?.[info.basic_info.thumbnail.length-1]?.url, durationSec, videoId);
 
 finishDownloaderUI();
 

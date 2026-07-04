@@ -65,10 +65,10 @@ localStorage.setItem("devMode","false");
 localStorage.setItem("proxyOn","false");
 localStorage.setItem("loopVid","false");
 
-window.ytproRecordDownload = function(title, filename, type){
+window.ytproRecordDownload = function(title, filename, type, thumbUrl, durationSec, videoId){
 try{
 var history = JSON.parse(localStorage.getItem("ytproDownloadHistory") || "[]");
-history.unshift({ title: title, filename: filename, type: type, date: Date.now() });
+history.unshift({ title: title, filename: filename, type: type, date: Date.now(), thumb: thumbUrl || "", duration: durationSec || 0, videoId: videoId || "" });
 if(history.length > 200) history = history.slice(0, 200);
 localStorage.setItem("ytproDownloadHistory", JSON.stringify(history));
 }catch(e){ console.error('[YTPRO] recordDownload failed', e); }
@@ -843,7 +843,7 @@ ytpSetI.innerHTML+=`<br><b style='font-size:18px' >Tube Edit Settings</b>
 </button>
 <br><br>
 <div style="display:flex;align-items:center;justify-content:space-between;width:calc(100% - 20px);margin:auto;">
-<b style="font-size:14px;">Download History</b>
+<b style="font-size:14px;">Your downloads</b>
 <span data-action="clearDownloadHistory" style="font-size:12px;color:${isD ? "#ccc" : "#444"};text-decoration:underline;">Clear All</span>
 </div>
 <div id="ytproDownloadHistoryList" style="text-align:left;margin-top:8px;"></div>
@@ -1034,24 +1034,52 @@ ytpSetI.querySelector(".ytproSettingsTabs").addEventListener("click",(e)=>{
   if(el.dataset.tab === "downloads") renderDownloadHistory();
 });
 
+function ytproTimeAgo(ts){
+  var diff = Math.floor((Date.now() - ts) / 1000);
+  var units = [["year",31536000],["month",2592000],["week",604800],["day",86400],["hour",3600],["minute",60]];
+  for(var i=0;i<units.length;i++){
+    var val = Math.floor(diff / units[i][1]);
+    if(val >= 1) return val + " " + units[i][0] + (val > 1 ? "s" : "") + " ago";
+  }
+  return "Just now";
+}
+
+function ytproFormatDuration(sec){
+  sec = Math.floor(sec || 0);
+  if(!sec) return "";
+  var h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = sec%60;
+  var mm = h > 0 ? String(m).padStart(2,"0") : String(m);
+  var ss = String(s).padStart(2,"0");
+  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
 function renderDownloadHistory(){
   var list = ytpSetI.querySelector("#ytproDownloadHistoryList");
   if(!list) return;
   var history = JSON.parse(localStorage.getItem("ytproDownloadHistory") || "[]");
 
   if(!history.length){
-    list.innerHTML = `<p style="font-size:12px;color:${isD ? "#888" : "#777"};">No downloads yet.</p>`;
+    list.innerHTML = `<p style="font-size:12px;color:${isD ? "#888" : "#777"};text-align:center;">No downloads yet.</p>`;
     return;
   }
 
+  var typeLabel = { video: "Video", audio: "Audio", thumbnail: "Thumbnail", caption: "Caption" };
+
   list.innerHTML = history.map((item, idx) => `
-    <div style="display:flex;align-items:center;justify-content:space-between;background:${isD ? "rgba(255,255,255,.05)" : "rgba(0,0,0,.05)"};border-radius:12px;padding:8px 10px;margin-bottom:6px;">
-      <div style="overflow:hidden;flex:1;margin-right:8px;">
-        <div style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item.title}</div>
-        <div style="font-size:10px;color:${isD ? "#999" : "#666"};">${item.type} · ${new Date(item.date).toLocaleString()}</div>
+    <div style="display:flex;align-items:flex-start;padding:8px 4px;border-bottom:1px solid ${isD ? "rgba(255,255,255,.08)" : "rgba(0,0,0,.08)"};">
+      <div data-hist-open="${idx}" style="position:relative;flex-shrink:0;width:120px;height:68px;border-radius:8px;overflow:hidden;background:${isD ? "#000" : "#ccc"};">
+        ${item.thumb ? `<img src="${item.thumb}" style="width:100%;height:100%;object-fit:cover;">` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:22px;">${item.type === "audio" ? "🎵" : item.type === "caption" ? "📄" : "🖼️"}</div>`}
+        ${item.duration ? `<span style="position:absolute;bottom:3px;right:3px;background:rgba(0,0,0,.8);color:#fff;font-size:9px;padding:1px 4px;border-radius:3px;">${ytproFormatDuration(item.duration)}</span>` : ""}
       </div>
-      <button data-hist-open="${idx}" style="border:0;border-radius:15px;padding:5px 10px;background:${c};color:${dc};font-size:11px;margin-right:5px;">Open</button>
-      <button data-hist-del="${idx}" style="border:0;border-radius:15px;padding:5px 10px;background:${isD ? "rgba(255,255,255,.1)" : "rgba(0,0,0,.1)"};font-size:11px;">✕</button>
+      <div data-hist-open="${idx}" style="flex:1;margin-left:10px;overflow:hidden;">
+        <div style="font-size:13px;font-weight:bold;color:${isD ? "#fff" : "#111"};display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.3;">${item.title}</div>
+        <div style="font-size:11px;color:${isD ? "#aaa" : "#666"};margin-top:4px;">${typeLabel[item.type] || item.type} · ${ytproTimeAgo(item.date)}</div>
+      </div>
+      <div data-hist-menu="${idx}" style="flex-shrink:0;padding:6px;font-size:16px;color:${isD ? "#ccc" : "#444"};">⋮</div>
+    </div>
+    <div id="ytproHistMenu${idx}" style="display:none;justify-content:flex-end;gap:8px;padding:6px 4px;">
+      <button data-hist-open="${idx}" style="border:0;border-radius:15px;padding:6px 12px;background:${c};color:${dc};font-size:11px;">Open</button>
+      <button data-hist-del="${idx}" style="border:0;border-radius:15px;padding:6px 12px;background:${isD ? "rgba(255,255,255,.1)" : "rgba(0,0,0,.1)"};font-size:11px;">Delete</button>
     </div>
   `).join("");
 
@@ -1059,6 +1087,12 @@ function renderDownloadHistory(){
     btn.addEventListener("click", () => {
       var item = history[parseInt(btn.dataset.histOpen)];
       window.Android?.openDownloadedFile?.(item.filename);
+    });
+  });
+  list.querySelectorAll("[data-hist-menu]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      var menu = document.getElementById("ytproHistMenu" + btn.dataset.histMenu);
+      if(menu) menu.style.display = menu.style.display === "flex" ? "none" : "flex";
     });
   });
   list.querySelectorAll("[data-hist-del]").forEach(btn => {
@@ -1069,6 +1103,7 @@ function renderDownloadHistory(){
     });
   });
 }
+
 
 renderDownloadHistory();
 
