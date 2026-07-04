@@ -12,12 +12,15 @@ import android.util.Rational;
 import android.view.WindowManager;
 import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
+import android.webkit.WebStorage;
 import android.widget.Toast;
 import java.io.File;
 import android.Manifest;
 
 import android.os.Build;
 import android.os.Environment;
+import androidx.webkit.ProxyConfig;
+import androidx.webkit.ProxyController;
 import androidx.webkit.WebViewFeature;
 
 import com.myapp.tubeedit.ForegroundService;
@@ -26,8 +29,10 @@ import com.myapp.tubeedit.MainActivity;
 import com.myapp.tubeedit.R;
 import com.myapp.tubeedit.utils.DownloadUtils;
 import com.myapp.tubeedit.utils.MediaMuxerUtils;
+import com.myapp.tubeedit.utils.SecurePrefs;
 
 import org.json.JSONObject;
+import java.util.concurrent.Executor;
 
 public class WebAppInterface {
 	private final MainActivity activity;
@@ -252,5 +257,88 @@ public class WebAppInterface {
 		} else {
 			Toast.makeText(activity, activity.getString(R.string.no_pip), Toast.LENGTH_SHORT).show();
 		}
+	}
+
+	// ---- Privacy: clear cookies, cache, form/history data ----
+	@JavascriptInterface
+	public void clearBrowsingData() {
+		activity.runOnUiThread(() -> {
+			CookieManager cookieManager = CookieManager.getInstance();
+			cookieManager.removeAllCookies(null);
+			cookieManager.flush();
+			web.clearCache(true);
+			web.clearHistory();
+			web.clearFormData();
+			WebStorage.getInstance().deleteAllData();
+			Toast.makeText(activity, "Cookies, cache & history cleared", Toast.LENGTH_SHORT).show();
+		});
+	}
+
+	// ---- Privacy: optional proxy for region-locked content ----
+	// Note: this is a plain HTTP/HTTPS or SOCKS proxy the user points at themselves
+	// (e.g. a proxy they run or subscribe to) — the app does not bundle or operate any proxy server.
+	@JavascriptInterface
+	public void setProxy(String host, String port, boolean enable) {
+		if (!WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
+			activity.runOnUiThread(() -> Toast.makeText(activity, "Proxy override not supported on this WebView version", Toast.LENGTH_SHORT).show());
+			return;
+		}
+		Executor executor = Runnable::run;
+		if (!enable || host == null || host.trim().isEmpty()) {
+			ProxyController.getInstance().clearProxyOverride(executor, () -> {
+				SecurePrefs.remove(activity, "proxy_host");
+				SecurePrefs.remove(activity, "proxy_port");
+				activity.runOnUiThread(() -> Toast.makeText(activity, "Proxy disabled", Toast.LENGTH_SHORT).show());
+			});
+			return;
+		}
+		String rule = host.trim() + ":" + port.trim();
+		ProxyConfig proxyConfig = new ProxyConfig.Builder()
+				.addProxyRule(rule)
+				.build();
+		ProxyController.getInstance().setProxyOverride(proxyConfig, executor, () -> {
+			SecurePrefs.putString(activity, "proxy_host", host.trim());
+			SecurePrefs.putString(activity, "proxy_port", port.trim());
+			activity.runOnUiThread(() -> Toast.makeText(activity, "Proxy enabled: " + rule, Toast.LENGTH_SHORT).show());
+		});
+	}
+
+	@JavascriptInterface
+	public String getSavedProxy() {
+		String host = SecurePrefs.getString(activity, "proxy_host", "");
+		String port = SecurePrefs.getString(activity, "proxy_port", "");
+		if (host.isEmpty()) return "";
+		return host + ":" + port;
+	}
+
+	// ---- Generic encrypted key/value storage (for anything sensitive added later) ----
+	@JavascriptInterface
+	public void setSecure(String key, String value) {
+		SecurePrefs.putString(activity, key, value);
+	}
+
+	@JavascriptInterface
+	public String getSecure(String key) {
+		return SecurePrefs.getString(activity, key, "");
+	}
+
+	// ---- Audio-only extraction (saves the already-downloaded audio track as its own file) ----
+	@JavascriptInterface
+	public void extractAudioOnly(String audioFileName, String outputFileName) {
+		java.io.File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS.concat("/YTPRO"));
+		java.io.File audio = new java.io.File(downloads, audioFileName);
+		java.io.File output = new java.io.File(downloads, outputFileName);
+
+		MediaMuxerUtils.extractAudioOnly(activity.getApplicationContext(), audio, output, new MediaMuxerUtils.MuxCallback() {
+			@Override
+			public void onSuccess(File output) {
+				Toast.makeText(activity, "Audio saved: " + output.getName(), Toast.LENGTH_SHORT).show();
+			}
+
+			@Override
+			public void onFailure(Exception e) {
+				Toast.makeText(activity, "Audio extraction failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+			}
+		});
 	}
 }

@@ -5,22 +5,24 @@ Last Updated On: 1 May , 2026 , 19:25 IST
 
 
 
-window.ytproSabrDownload= async function() {
+window.ytproSabrDownload= async function(overrideVideoId, autoBest) {
 
 
 var ytproDownDiv=getDownloadElement();
 
-ytproDownDiv.querySelector("#videoViewDiv").innerHTML="Loading...";
+if (!autoBest) ytproDownDiv.querySelector("#videoViewDiv").innerHTML="Loading...";
 
 
 //Get Video ID
-var videoId ="";
+var videoId = overrideVideoId || "";
 
+if(!videoId){
 if(window.location.pathname.indexOf("shorts") > -1){
 videoId=window.location.pathname.substr(8,window.location.pathname.length);
 }
 else{
 videoId=new URLSearchParams(window.location.search).get("v");
+}
 }
 
 
@@ -300,6 +302,17 @@ categories: {
 }
 };
 
+// ── Playlist bulk-download path: skip the picker UI, grab best quality, download, return ──
+if (autoBest) {
+const best = [...muxableOptions].sort((a,b) => (b.videoDetails?.bitrate||0) - (a.videoDetails?.bitrate||0))[0];
+if (!best) {
+window.Android?.showToast?.('No downloadable format for: ' + safeTitle);
+return;
+}
+window.Android?.showToast?.('Downloading: ' + safeTitle);
+await downloadSABRStream(best.videoItag, best.audioItag, best.container === 'webm', best.languageId, EnabledTrackTypes.VIDEO_AND_AUDIO);
+return;
+}
 
 
 ytproDownDiv.insertAdjacentHTML('beforeend',`<style>#downytprodiv a{text-decoration:none;} #downytprodiv li{list-style:none; display:flex;align-items:center;justify-content:center;border-radius:25px;padding:8px;background:${d};margin:5px;margin-top:8px}
@@ -320,6 +333,17 @@ background:${d};
 
 
 ytproDownDiv.querySelector("#videoViewDiv").innerHTML=`<label for="selectLang" style="margin-right:5px;">Language:</label>`;
+
+if (new URLSearchParams(window.location.search).get("list")) {
+var plBtn = document.createElement("button");
+plBtn.textContent = "⬇ Download Entire Playlist";
+Object.assign(plBtn.style, {
+display: "block", width: "100%", margin: "8px 0", padding: "10px",
+borderRadius: "20px", border: "0", background: c, color: dc, fontSize: "14px"
+});
+plBtn.addEventListener("click", () => { window.ytproDownloadPlaylist(); });
+ytproDownDiv.querySelector("#videoViewDiv").appendChild(plBtn);
+}
 
 
 var langList=document.createElement("select");
@@ -1156,3 +1180,59 @@ div.style.bottom="calc(50% + 40px)";
 
 
 
+
+/* ── Playlist bulk downloader ──────────────────────────────────────────
+   Downloads every video in the currently open playlist (list= param)
+   sequentially, auto-picking the highest quality muxable format for each. */
+window.ytproDownloadPlaylist = async function () {
+	var listId = new URLSearchParams(window.location.search).get("list");
+	if (!listId) {
+		window.Android?.showToast?.('Open a playlist first (URL must contain "list=").');
+		return;
+	}
+
+	if (!Android.hasStoragePermission()) return;
+
+	window.Android?.showToast?.('Fetching playlist...');
+
+	let yt;
+	try {
+		const { Innertube } = await import('https://cdn.jsdelivr.net/npm/youtubei.js@17.0.1/bundle/browser.min.js');
+		const cookies = window.Android?.getAllCookies?.('https://www.youtube.com') ?? '';
+		yt = await Innertube.create({ cookie: cookies, generate_session_locally: true });
+	} catch (e) {
+		window.Android?.showToast?.('Failed to init playlist fetcher: ' + e.message);
+		return;
+	}
+
+	let playlist;
+	try {
+		playlist = await yt.getPlaylist(listId);
+	} catch (e) {
+		window.Android?.showToast?.('Could not load playlist: ' + e.message);
+		return;
+	}
+
+	var rawItems = playlist?.videos || playlist?.items || [];
+	var videoIds = rawItems.map(v => v.id || v.video_id || v.videoId).filter(Boolean);
+
+	if (!videoIds.length) {
+		window.Android?.showToast?.('No videos found in this playlist.');
+		return;
+	}
+
+	window.Android?.showToast?.(`Starting download of ${videoIds.length} videos...`);
+
+	for (let i = 0; i < videoIds.length; i++) {
+		window.Android?.showToast?.(`(${i + 1}/${videoIds.length}) Downloading...`);
+		try {
+			await window.ytproSabrDownload(videoIds[i], true);
+		} catch (e) {
+			console.error('[YTPRO] Playlist item failed:', videoIds[i], e);
+		}
+		// brief pause between items so we don't hammer YouTube's endpoints
+		await new Promise(r => setTimeout(r, 1500));
+	}
+
+	window.Android?.showToast?.('Playlist download finished.');
+};

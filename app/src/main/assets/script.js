@@ -15,7 +15,7 @@ var script = document.createElement('script'); script.src="//youtube.com/ytpro_c
 if(!YTProVer){
 
 /*Few Stupid Inits*/
-var YTProVer="3.98";
+var YTProVer="1.0.0";
 var ytoldV="";
 var isF=false;   //what is this for?
 var isAp=false; // oh it's for bg play 
@@ -62,6 +62,7 @@ localStorage.setItem("saveCInfo","true");
 localStorage.setItem("geminiModel","3.0 Flash");
 localStorage.setItem("prompt","Give me details about this YouTube video Id: {videoId} , a detailed summary of timestamps with facts , resources and reviews of the main content");
 localStorage.setItem("devMode","false");
+localStorage.setItem("proxyOn","false");
 
 localStorage.setItem("block_60fps","false");
 
@@ -711,12 +712,49 @@ column:50%;
 margin-right:2%;
 color:${c};
 }
+.ytproSettingsTabs{
+display:flex;
+gap:5px;
+width:calc(100% - 20px);
+margin:10px auto;
+position:sticky;
+top:0;
+background:${isD ? "#212121" : "#f1f1f1"};
+z-index:5;
+padding-top:5px;
+}
+.ytproSettingsTabs div{
+flex:1;
+text-align:center;
+padding:8px 0;
+border-radius:20px;
+font-size:13px;
+background:transparent;
+color:${isD ? "#ccc" : "#444"};
+}
+.ytproSettingsTabs div.active{
+background:${c};
+color:${dc};
+}
+.ytproSettingsPane{display:none;}
+.ytproSettingsPane.active{display:block;}
+#ssprodivI .proxyRow{display:flex;gap:6px;width:calc(100% - 20px);margin:5px auto;}
+#ssprodivI .proxyRow input{flex:1;height:35px;border-radius:15px;border:0;padding:0 10px;background:${isD ? "rgba(255,255,255,.1)" : "rgba(0,0,0,.1)"};color:${isD ? "#fff" : "#000"};}
 </style>`;
 ytpSetI.innerHTML+=`<br><b style='font-size:18px' >Tube Edit Settings</b>
 <span style="font-size:10px">v${YTProVer}</span>
 <br><br>
 <div><input type="url" placeholder="Enter Youtube URL" id="ytproUrlInput" ></div>
 <br>
+
+<div class="ytproSettingsTabs">
+<div data-tab="playback" class="active">Playback</div>
+<div data-tab="downloads">Downloads</div>
+<div data-tab="privacy">Privacy</div>
+<div data-tab="about">About</div>
+</div>
+
+<div class="ytproSettingsPane active" data-pane="playback">
 <button data-action="hearts">Liked Videos
 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="${isD ? "#ccc" : "#444"}" viewBox="0 0 16 16">
 <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708"/>
@@ -748,18 +786,42 @@ ytpSetI.innerHTML+=`<br><b style='font-size:18px' >Tube Edit Settings</b>
 <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708"/>
 </svg>
 </button>
+</div>
+
+<div class="ytproSettingsPane" data-pane="downloads">
+<p style="font-size:13px;text-align:left;width:calc(100% - 20px);margin:auto;color:${isD ? "#aaa" : "#555"}">Open any video's download menu for per-video quality options (including Audio Only). Open a playlist and its download menu will show a "Download Entire Playlist" button.</p>
 <br>
 <button data-action="disableCodecs">Disable Codecs
 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="${isD ? "#ccc" : "#444"}" viewBox="0 0 16 16">
 <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708"/>
 </svg>
 </button>
+</div>
+
+<div class="ytproSettingsPane" data-pane="privacy">
+<button data-action="clearBrowsingData">Clear Cookies, Cache &amp; History
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="${isD ? "#ccc" : "#444"}" viewBox="0 0 16 16">
+<path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708"/>
+</svg>
+</button>
+<br>
+<div>Use Proxy <span data-action="sttCnf" data-value="proxyOn" style="${sttCnf(0,0,"proxyOn")}" ><b style="${sttCnf(0,1,"proxyOn")}"></b></span></div>
+<p style="font-size:12px;text-align:left;width:calc(100% - 20px);margin:5px auto;color:${isD ? "#aaa" : "#555"}">Point Tube Edit at a proxy/VPN server you already have (host + port) to reach region-locked videos. This app does not provide or operate a proxy itself.</p>
+<div class="proxyRow">
+<input type="text" id="proxyHostInput" placeholder="Proxy host (e.g. 1.2.3.4)" value="${window.Android?.getSavedProxy?.() ? window.Android.getSavedProxy().split(':')[0] : ''}">
+<input type="text" id="proxyPortInput" placeholder="Port" style="max-width:70px;" value="${window.Android?.getSavedProxy?.() ? window.Android.getSavedProxy().split(':')[1] : ''}">
+</div>
+<button data-action="applyProxy" style="margin-top:5px;">Apply Proxy Settings</button>
 <br>
 <div>Developer Mode <span data-action="sttCnf" data-value="devMode" style="${sttCnf(0,0,"devMode")}" ><b style="${sttCnf(0,1,"devMode")}"></b></span></div>
-<br><br>
+</div>
+
+<div class="ytproSettingsPane" data-pane="about">
 <p style="font-size:1.25rem;width:calc(100% - 20px);margin:auto;text-align:left"><b style="font-weight:bold">Disclaimer</b>: This is an educational project aimed at showcasing javascript injection into a webview to enhance productivity.
 <br><br></p>
 <div style="text-align:center;color:#aaa;">Made with ❤ by Munna Agent</div>
+</div>
+
 <br><br><br>
 
 <div class="geminiModels">
@@ -827,6 +889,19 @@ var actionsList={
     localStorage.removeItem('geminiChatInfo');
     localStorage.setItem('geminiModel',value);
     el.parentElement.style.display='none';
+  },
+  clearBrowsingData:()=>{
+    window.Android?.clearBrowsingData?.();
+  },
+  applyProxy:()=>{
+    var host=document.getElementById('proxyHostInput').value.trim();
+    var port=document.getElementById('proxyPortInput').value.trim() || '8080';
+    var enabled = localStorage.getItem('proxyOn') === 'true';
+    if(enabled && host){
+      window.Android?.setProxy?.(host, port, true);
+    } else {
+      window.Android?.setProxy?.('', '', false);
+    }
   }
 }
 
@@ -840,6 +915,16 @@ ytpSetI.querySelectorAll("[data-action]").forEach(button =>{
     actionsList[button.dataset.action](button);
     }
   })
+});
+
+//settings tabs
+ytpSetI.querySelector(".ytproSettingsTabs").addEventListener("click",(e)=>{
+  var el=e.target.closest("[data-tab]");
+  if(!el) return;
+  ytpSetI.querySelectorAll(".ytproSettingsTabs div").forEach(t=>t.classList.remove("active"));
+  ytpSetI.querySelectorAll(".ytproSettingsPane").forEach(p=>p.classList.remove("active"));
+  el.classList.add("active");
+  ytpSetI.querySelector(`.ytproSettingsPane[data-pane="${el.dataset.tab}"]`).classList.add("active");
 });
 
 

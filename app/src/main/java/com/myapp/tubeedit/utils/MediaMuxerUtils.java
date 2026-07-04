@@ -261,6 +261,115 @@ public class MediaMuxerUtils {
         }
     }
 
+    // Extracts just the audio track from a downloaded audio stream file and saves
+    // it as a standalone playable file (.m4a container). Android has no built-in
+    // MP3 encoder, so this repackages the original AAC/Opus audio stream instead
+    // of re-encoding to .mp3 — quality is untouched and it plays in any player.
+    public static void extractAudioOnly(Context context,
+                                         File audioFile,
+                                         File outputFile,
+                                         MuxCallback callback) {
+        new Thread(() -> {
+            MediaExtractor extractor = new MediaExtractor();
+            MediaMuxer muxer = null;
+            Uri outputUri = null;
+            ParcelFileDescriptor pfd = null;
+
+            try {
+                if (audioFile == null || !audioFile.exists()) {
+                    throw new Exception("Audio source file not found: " + (audioFile == null ? "null" : audioFile.getName()));
+                }
+
+                int outFormat = MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4;
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    ContentResolver resolver = context.getContentResolver();
+                    ContentValues values = new ContentValues();
+                    values.put(MediaStore.Downloads.DISPLAY_NAME, outputFile.getName());
+                    values.put(MediaStore.Downloads.MIME_TYPE, "audio/mp4");
+                    values.put(MediaStore.Downloads.RELATIVE_PATH, "Download/YTPRO");
+                    values.put(MediaStore.Downloads.IS_PENDING, 1);
+
+                    outputUri = resolver.insert(MediaStore.Downloads.getContentUri("external"), values);
+                    if (outputUri == null) throw new Exception("MediaStore insert returned null for output");
+
+                    pfd = resolver.openFileDescriptor(outputUri, "rw");
+                    if (pfd == null) throw new Exception("openFileDescriptor returned null");
+
+                    muxer = new MediaMuxer(pfd.getFileDescriptor(), outFormat);
+                } else {
+                    muxer = new MediaMuxer(outputFile.getAbsolutePath(), outFormat);
+                }
+
+                extractor.setDataSource(audioFile.getAbsolutePath());
+
+                int audioTrackIndex = -1;
+                int muxerTrackIndex = -1;
+                for (int i = 0; i < extractor.getTrackCount(); i++) {
+                    MediaFormat format = extractor.getTrackFormat(i);
+                    String mime = format.getString(MediaFormat.KEY_MIME);
+                    if (mime != null && mime.startsWith("audio/")) {
+                        extractor.selectTrack(i);
+                        muxerTrackIndex = muxer.addTrack(format);
+                        audioTrackIndex = i;
+                        break;
+                    }
+                }
+
+                if (audioTrackIndex < 0) throw new Exception("No audio track found in source file");
+
+                muxer.start();
+
+                ByteBuffer buffer = ByteBuffer.allocate(1024 * 1024);
+                MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
+
+                while (true) {
+                    int sampleSize = extractor.readSampleData(buffer, 0);
+                    if (sampleSize < 0) break;
+                    info.offset = 0;
+                    info.size = sampleSize;
+                    info.presentationTimeUs = extractor.getSampleTime();
+                    info.flags = extractor.getSampleFlags();
+                    muxer.writeSampleData(muxerTrackIndex, buffer, info);
+                    extractor.advance();
+                }
+
+                muxer.stop();
+                muxer.release();
+                muxer = null;
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && outputUri != null) {
+                    ContentValues values = new ContentValues();
+                    values.put(MediaStore.Downloads.IS_PENDING, 0);
+                    context.getContentResolver().update(outputUri, values, null, null);
+                }
+                if (pfd != null) { pfd.close(); pfd = null; }
+
+                Log.d(TAG, "Audio extraction successful: " + outputFile.getName());
+                if (callback != null) {
+                    new Handler(Looper.getMainLooper()).post(() -> callback.onSuccess(outputFile));
+                }
+
+            } catch (Exception e) {
+                Log.e(TAG, "Audio extraction failed: " + e.getMessage());
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && outputUri != null) {
+                    try { context.getContentResolver().delete(outputUri, null, null); } catch (Exception ignored) {}
+                } else if (outputFile.exists()) {
+                    outputFile.delete();
+                }
+                if (callback != null) {
+                    final Exception err = e;
+                    new Handler(Looper.getMainLooper()).post(() -> callback.onFailure(err));
+                }
+            } finally {
+                try { extractor.release(); } catch (Exception ignored) {}
+                try { if (muxer != null) { muxer.stop(); muxer.release(); } } catch (Exception ignored) {}
+                try { if (pfd != null) pfd.close(); } catch (Exception ignored) {}
+                deleteFile(context, audioFile);
+            }
+        }).start();
+    }
+
     // Checks if a codec mime type is supported on this device
     private static boolean isCodecSupported(String mime) {
         try {
