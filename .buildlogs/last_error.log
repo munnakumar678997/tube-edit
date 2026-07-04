@@ -1,14 +1,62 @@
+Downloading https://services.gradle.org/distributions/gradle-8.13-bin.zip
+..................................................................................................................................
+Unzipping /home/runner/.gradle/wrapper/dists/gradle-8.13-bin/5xuhj0ry160q40clulazy9h7d/gradle-8.13-bin.zip to /home/runner/.gradle/wrapper/dists/gradle-8.13-bin/5xuhj0ry160q40clulazy9h7d
+Set executable permissions for: /home/runner/.gradle/wrapper/dists/gradle-8.13-bin/5xuhj0ry160q40clulazy9h7d/gradle-8.13/bin/gradle
+
+Welcome to Gradle 8.13!
+
+Here are the highlights of this release:
+ - Daemon JVM auto-provisioning
+ - Enhancements for Scala plugin and JUnit testing
+ - Improvements for build authors and plugin developers
+
+For more details see https://docs.gradle.org/8.13/release-notes.html
+
+Starting a Gradle Daemon (subsequent builds will be faster)
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preReleaseBuild UP-TO-DATE
+> Task :app:mergeReleaseJniLibFolders
+> Task :app:mergeReleaseNativeLibs NO-SOURCE
+> Task :app:stripReleaseDebugSymbols NO-SOURCE
+> Task :app:extractReleaseNativeSymbolTables NO-SOURCE
+> Task :app:mergeReleaseNativeDebugMetadata NO-SOURCE
+> Task :app:checkReleaseDuplicateClasses
+> Task :app:javaPreCompileRelease
+> Task :app:checkReleaseAarMetadata
+> Task :app:processReleaseNavigationResources
+> Task :app:generateReleaseResValues
+> Task :app:compileReleaseNavigationResources
+> Task :app:mapReleaseSourceSetPaths
+> Task :app:generateReleaseResources
+> Task :app:packageReleaseResources
+> Task :app:mergeReleaseResources
+> Task :app:createReleaseCompatibleScreenManifests
+> Task :app:extractDeepLinksRelease
+> Task :app:parseReleaseLocalResources
+
+> Task :app:processReleaseMainManifest
+package="com.myapp.tubeedit" found in source AndroidManifest.xml: /home/runner/work/tube-edit/tube-edit/app/src/main/AndroidManifest.xml.
+Setting the namespace via the package attribute in the source AndroidManifest.xml is no longer supported, and the value is ignored.
 Recommendation: remove package="com.myapp.tubeedit" from the source AndroidManifest.xml: /home/runner/work/tube-edit/tube-edit/app/src/main/AndroidManifest.xml.
 
 > Task :app:processReleaseManifest
-> Task :app:processReleaseManifestForPackage
 > Task :app:mergeReleaseArtProfile
 > Task :app:extractProguardFiles
 > Task :app:processReleaseJavaRes NO-SOURCE
 > Task :app:mergeReleaseStartupProfile
-> Task :app:processReleaseResources
+> Task :app:processReleaseManifestForPackage
 > Task :app:mergeReleaseShaders
+> Task :app:compileReleaseShaders NO-SOURCE
+> Task :app:generateReleaseAssets UP-TO-DATE
+> Task :app:mergeReleaseAssets
+> Task :app:compressReleaseAssets
+> Task :app:extractReleaseVersionControlInfo
 > Task :app:mergeReleaseJavaResource
+> Task :app:collectReleaseDependencies
+> Task :app:sdkReleaseDependencyData
+> Task :app:writeReleaseAppMetadata
+> Task :app:processReleaseResources
+> Task :app:writeReleaseSigningConfigVersions
 
 > Task :app:compileReleaseJavaWithJavac
 Java compiler version 21 has deprecated support for compiling with source/target version 8.
@@ -27,23 +75,20 @@ Note: Recompile with -Xlint:deprecation for details.
 
 > Task :app:expandReleaseArtProfileWildcards
 > Task :app:mergeReleaseGeneratedProguardFiles
-> Task :app:compileReleaseShaders NO-SOURCE
-> Task :app:generateReleaseAssets UP-TO-DATE
-> Task :app:mergeReleaseAssets
-> Task :app:compressReleaseAssets
-> Task :app:extractReleaseVersionControlInfo
 > Task :app:generateReleaseLintVitalReportModel
 
-> Task :app:minifyReleaseWithR8
-ERROR: Missing classes detected while running R8. Please add the missing classes or apply additional keep rules that are generated in /home/runner/work/tube-edit/tube-edit/app/build/outputs/mapping/release/missing_rules.txt.
-ERROR: R8: Missing class com.google.errorprone.annotations.CanIgnoreReturnValue (referenced from: com.google.crypto.tink.KeysetManager com.google.crypto.tink.KeysetManager.add(com.google.crypto.tink.KeyTemplate) and 52 other contexts)
-Missing class com.google.errorprone.annotations.CheckReturnValue (referenced from: com.google.crypto.tink.InsecureSecretKeyAccess and 1 other context)
-Missing class com.google.errorprone.annotations.Immutable (referenced from: com.google.crypto.tink.InsecureSecretKeyAccess and 40 other contexts)
-Missing class com.google.errorprone.annotations.RestrictedApi (referenced from: com.google.crypto.tink.aead.AesEaxKey$Builder com.google.crypto.tink.aead.AesEaxKey.builder() and 6 other contexts)
-Missing class javax.annotation.Nullable (referenced from: java.lang.Object com.google.crypto.tink.PrimitiveSet$Entry.fullPrimitive and 86 other contexts)
-Missing class javax.annotation.concurrent.GuardedBy (referenced from: com.google.crypto.tink.proto.Keyset$Builder com.google.crypto.tink.KeysetManager.keysetBuilder and 3 other contexts)
-
 > Task :app:minifyReleaseWithR8 FAILED
+ERROR: Missing classes detected while running R8. Please add the missing classes or apply additional keep rules that are generated in /home/runner/work/tube-edit/tube-edit/app/build/outputs/mapping/release/missing_rules.txt.
+ERROR: R8: Missing class com.google.api.client.http.GenericUrl (referenced from: java.lang.String com.google.crypto.tink.util.KeysDownloader.fetchAndCacheData())
+Missing class com.google.api.client.http.HttpHeaders (referenced from: java.lang.String com.google.crypto.tink.util.KeysDownloader.fetchAndCacheData() and 1 other context)
+Missing class com.google.api.client.http.HttpRequest (referenced from: java.lang.String com.google.crypto.tink.util.KeysDownloader.fetchAndCacheData())
+Missing class com.google.api.client.http.HttpRequestFactory (referenced from: java.lang.String com.google.crypto.tink.util.KeysDownloader.fetchAndCacheData())
+Missing class com.google.api.client.http.HttpResponse (referenced from: java.lang.String com.google.crypto.tink.util.KeysDownloader.fetchAndCacheData())
+Missing class com.google.api.client.http.HttpTransport (referenced from: com.google.api.client.http.HttpTransport com.google.crypto.tink.util.KeysDownloader$Builder.httpTransport and 6 other contexts)
+Missing class com.google.api.client.http.javanet.NetHttpTransport$Builder (referenced from: void com.google.crypto.tink.util.KeysDownloader.<clinit>())
+Missing class com.google.api.client.http.javanet.NetHttpTransport (referenced from: com.google.api.client.http.javanet.NetHttpTransport com.google.crypto.tink.util.KeysDownloader.DEFAULT_HTTP_TRANSPORT and 3 other contexts)
+Missing class org.joda.time.Instant (referenced from: long com.google.crypto.tink.util.KeysDownloader.getCurrentTimeInMillis())
+
 > Task :app:lintVitalAnalyzeRelease
 
 [Incubating] Problems report is available at: file:///home/runner/work/tube-edit/tube-edit/build/reports/problems/problems-report.html
@@ -92,35 +137,6 @@ org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':app:min
 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:303)
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.execute(DefaultPlanExecutor.java:459)
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:376)
-	at org.gradle.execution.plan.DefaultPlanExecutor.process(DefaultPlanExecutor.java:111)
-	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph.executeWithServices(DefaultTaskExecutionGraph.java:138)
-	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph.execute(DefaultTaskExecutionGraph.java:123)
-	at org.gradle.execution.SelectedTaskExecutionAction.execute(SelectedTaskExecutionAction.java:35)
-	at org.gradle.execution.DryRunBuildExecutionAction.execute(DryRunBuildExecutionAction.java:51)
-	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor$ExecuteTasks.call(BuildOperationFiringBuildWorkerExecutor.java:54)
-	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor$ExecuteTasks.call(BuildOperationFiringBuildWorkerExecutor.java:43)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:210)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:205)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:67)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:60)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:167)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:60)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:54)
-	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor.execute(BuildOperationFiringBuildWorkerExecutor.java:40)
-	at org.gradle.internal.build.DefaultBuildLifecycleController.lambda$executeTasks$10(DefaultBuildLifecycleController.java:313)
-	at org.gradle.internal.model.StateTransitionController.doTransition(StateTransitionController.java:266)
-	at org.gradle.internal.model.StateTransitionController.lambda$tryTransition$8(StateTransitionController.java:177)
-	at org.gradle.internal.work.DefaultSynchronizer.withLock(DefaultSynchronizer.java:46)
-	at org.gradle.internal.model.StateTransitionController.tryTransition(StateTransitionController.java:177)
-	at org.gradle.internal.build.DefaultBuildLifecycleController.executeTasks(DefaultBuildLifecycleController.java:304)
-	at org.gradle.internal.build.DefaultBuildWorkGraphController$DefaultBuildWorkGraph.runWork(DefaultBuildWorkGraphController.java:220)
-	at org.gradle.internal.work.DefaultWorkerLeaseService.withLocks(DefaultWorkerLeaseService.java:263)
-	at org.gradle.internal.work.DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:127)
-	at org.gradle.composite.internal.DefaultBuildController.doRun(DefaultBuildController.java:181)
-	at org.gradle.composite.internal.DefaultBuildController.access$000(DefaultBuildController.java:50)
-	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.lambda$run$0(DefaultBuildController.java:198)
-	at org.gradle.internal.operations.CurrentBuildOperationRef.with(CurrentBuildOperationRef.java:85)
-	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.run(DefaultBuildController.java:198)
 	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
 Caused by: org.gradle.workers.internal.DefaultWorkerExecutor$WorkExecutionException: A failure occurred while executing com.android.build.gradle.internal.tasks.R8Task$R8Runnable
@@ -246,35 +262,6 @@ Caused by: org.gradle.workers.internal.DefaultWorkerExecutor$WorkExecutionExcept
 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:303)
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.execute(DefaultPlanExecutor.java:459)
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:376)
-	at org.gradle.execution.plan.DefaultPlanExecutor.process(DefaultPlanExecutor.java:111)
-	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph.executeWithServices(DefaultTaskExecutionGraph.java:138)
-	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph.execute(DefaultTaskExecutionGraph.java:123)
-	at org.gradle.execution.SelectedTaskExecutionAction.execute(SelectedTaskExecutionAction.java:35)
-	at org.gradle.execution.DryRunBuildExecutionAction.execute(DryRunBuildExecutionAction.java:51)
-	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor$ExecuteTasks.call(BuildOperationFiringBuildWorkerExecutor.java:54)
-	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor$ExecuteTasks.call(BuildOperationFiringBuildWorkerExecutor.java:43)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:210)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:205)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:67)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:60)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:167)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:60)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:54)
-	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor.execute(BuildOperationFiringBuildWorkerExecutor.java:40)
-	at org.gradle.internal.build.DefaultBuildLifecycleController.lambda$executeTasks$10(DefaultBuildLifecycleController.java:313)
-	at org.gradle.internal.model.StateTransitionController.doTransition(StateTransitionController.java:266)
-	at org.gradle.internal.model.StateTransitionController.lambda$tryTransition$8(StateTransitionController.java:177)
-	at org.gradle.internal.work.DefaultSynchronizer.withLock(DefaultSynchronizer.java:46)
-	at org.gradle.internal.model.StateTransitionController.tryTransition(StateTransitionController.java:177)
-	at org.gradle.internal.build.DefaultBuildLifecycleController.executeTasks(DefaultBuildLifecycleController.java:304)
-	at org.gradle.internal.build.DefaultBuildWorkGraphController$DefaultBuildWorkGraph.runWork(DefaultBuildWorkGraphController.java:220)
-	at org.gradle.internal.work.DefaultWorkerLeaseService.withLocks(DefaultWorkerLeaseService.java:263)
-	at org.gradle.internal.work.DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:127)
-	at org.gradle.composite.internal.DefaultBuildController.doRun(DefaultBuildController.java:181)
-	at org.gradle.composite.internal.DefaultBuildController.access$000(DefaultBuildController.java:50)
-	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.lambda$run$0(DefaultBuildController.java:198)
-	at org.gradle.internal.operations.CurrentBuildOperationRef.with(CurrentBuildOperationRef.java:85)
-	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.run(DefaultBuildController.java:198)
 	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
 Caused by: com.android.tools.r8.CompilationFailedException: Compilation failed to complete
@@ -314,12 +301,15 @@ Caused by: com.android.tools.r8.CompilationFailedException: Compilation failed t
 	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner.runBatch(DefaultConditionalExecutionQueue.java:164)
 	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner.run(DefaultConditionalExecutionQueue.java:133)
 	... 2 more
-Caused by: com.android.tools.r8.internal.g: Missing class com.google.errorprone.annotations.CanIgnoreReturnValue (referenced from: com.google.crypto.tink.KeysetManager com.google.crypto.tink.KeysetManager.add(com.google.crypto.tink.KeyTemplate) and 52 other contexts)
-Missing class com.google.errorprone.annotations.CheckReturnValue (referenced from: com.google.crypto.tink.InsecureSecretKeyAccess and 1 other context)
-Missing class com.google.errorprone.annotations.Immutable (referenced from: com.google.crypto.tink.InsecureSecretKeyAccess and 40 other contexts)
-Missing class com.google.errorprone.annotations.RestrictedApi (referenced from: com.google.crypto.tink.aead.AesEaxKey$Builder com.google.crypto.tink.aead.AesEaxKey.builder() and 6 other contexts)
-Missing class javax.annotation.Nullable (referenced from: java.lang.Object com.google.crypto.tink.PrimitiveSet$Entry.fullPrimitive and 86 other contexts)
-Missing class javax.annotation.concurrent.GuardedBy (referenced from: com.google.crypto.tink.proto.Keyset$Builder com.google.crypto.tink.KeysetManager.keysetBuilder and 3 other contexts)
+Caused by: com.android.tools.r8.internal.g: Missing class com.google.api.client.http.GenericUrl (referenced from: java.lang.String com.google.crypto.tink.util.KeysDownloader.fetchAndCacheData())
+Missing class com.google.api.client.http.HttpHeaders (referenced from: java.lang.String com.google.crypto.tink.util.KeysDownloader.fetchAndCacheData() and 1 other context)
+Missing class com.google.api.client.http.HttpRequest (referenced from: java.lang.String com.google.crypto.tink.util.KeysDownloader.fetchAndCacheData())
+Missing class com.google.api.client.http.HttpRequestFactory (referenced from: java.lang.String com.google.crypto.tink.util.KeysDownloader.fetchAndCacheData())
+Missing class com.google.api.client.http.HttpResponse (referenced from: java.lang.String com.google.crypto.tink.util.KeysDownloader.fetchAndCacheData())
+Missing class com.google.api.client.http.HttpTransport (referenced from: com.google.api.client.http.HttpTransport com.google.crypto.tink.util.KeysDownloader$Builder.httpTransport and 6 other contexts)
+Missing class com.google.api.client.http.javanet.NetHttpTransport$Builder (referenced from: void com.google.crypto.tink.util.KeysDownloader.<clinit>())
+Missing class com.google.api.client.http.javanet.NetHttpTransport (referenced from: com.google.api.client.http.javanet.NetHttpTransport com.google.crypto.tink.util.KeysDownloader.DEFAULT_HTTP_TRANSPORT and 3 other contexts)
+Missing class org.joda.time.Instant (referenced from: long com.google.crypto.tink.util.KeysDownloader.getCurrentTimeInMillis())
 	at com.android.tools.r8.internal.ff3.a(R8_8.13.6_1c658b3b683138d620220f6965281391a8f410eddb02f3ff35a06caf88d6c59d:21)
 	at com.android.tools.r8.internal.ff3.error(R8_8.13.6_1c658b3b683138d620220f6965281391a8f410eddb02f3ff35a06caf88d6c59d:1)
 	at com.android.tools.r8.shaking.m0.a(R8_8.13.6_1c658b3b683138d620220f6965281391a8f410eddb02f3ff35a06caf88d6c59d:6863)
@@ -330,12 +320,15 @@ Missing class javax.annotation.concurrent.GuardedBy (referenced from: com.google
 	at com.android.tools.r8.R8.a(R8_8.13.6_1c658b3b683138d620220f6965281391a8f410eddb02f3ff35a06caf88d6c59d:5)
 	at com.android.tools.r8.internal.is0.a(R8_8.13.6_1c658b3b683138d620220f6965281391a8f410eddb02f3ff35a06caf88d6c59d:28)
 	... 32 more
-	Suppressed: java.lang.RuntimeException: com.android.tools.r8.internal.g: Missing class com.google.errorprone.annotations.CanIgnoreReturnValue (referenced from: com.google.crypto.tink.KeysetManager com.google.crypto.tink.KeysetManager.add(com.google.crypto.tink.KeyTemplate) and 52 other contexts)
-Missing class com.google.errorprone.annotations.CheckReturnValue (referenced from: com.google.crypto.tink.InsecureSecretKeyAccess and 1 other context)
-Missing class com.google.errorprone.annotations.Immutable (referenced from: com.google.crypto.tink.InsecureSecretKeyAccess and 40 other contexts)
-Missing class com.google.errorprone.annotations.RestrictedApi (referenced from: com.google.crypto.tink.aead.AesEaxKey$Builder com.google.crypto.tink.aead.AesEaxKey.builder() and 6 other contexts)
-Missing class javax.annotation.Nullable (referenced from: java.lang.Object com.google.crypto.tink.PrimitiveSet$Entry.fullPrimitive and 86 other contexts)
-Missing class javax.annotation.concurrent.GuardedBy (referenced from: com.google.crypto.tink.proto.Keyset$Builder com.google.crypto.tink.KeysetManager.keysetBuilder and 3 other contexts)
+	Suppressed: java.lang.RuntimeException: com.android.tools.r8.internal.g: Missing class com.google.api.client.http.GenericUrl (referenced from: java.lang.String com.google.crypto.tink.util.KeysDownloader.fetchAndCacheData())
+Missing class com.google.api.client.http.HttpHeaders (referenced from: java.lang.String com.google.crypto.tink.util.KeysDownloader.fetchAndCacheData() and 1 other context)
+Missing class com.google.api.client.http.HttpRequest (referenced from: java.lang.String com.google.crypto.tink.util.KeysDownloader.fetchAndCacheData())
+Missing class com.google.api.client.http.HttpRequestFactory (referenced from: java.lang.String com.google.crypto.tink.util.KeysDownloader.fetchAndCacheData())
+Missing class com.google.api.client.http.HttpResponse (referenced from: java.lang.String com.google.crypto.tink.util.KeysDownloader.fetchAndCacheData())
+Missing class com.google.api.client.http.HttpTransport (referenced from: com.google.api.client.http.HttpTransport com.google.crypto.tink.util.KeysDownloader$Builder.httpTransport and 6 other contexts)
+Missing class com.google.api.client.http.javanet.NetHttpTransport$Builder (referenced from: void com.google.crypto.tink.util.KeysDownloader.<clinit>())
+Missing class com.google.api.client.http.javanet.NetHttpTransport (referenced from: com.google.api.client.http.javanet.NetHttpTransport com.google.crypto.tink.util.KeysDownloader.DEFAULT_HTTP_TRANSPORT and 3 other contexts)
+Missing class org.joda.time.Instant (referenced from: long com.google.crypto.tink.util.KeysDownloader.getCurrentTimeInMillis())
 		at com.android.tools.r8.internal.ff3.a(R8_8.13.6_1c658b3b683138d620220f6965281391a8f410eddb02f3ff35a06caf88d6c59d:27)
 		at com.android.tools.r8.shaking.m0.a(R8_8.13.6_1c658b3b683138d620220f6965281391a8f410eddb02f3ff35a06caf88d6c59d:6865)
 		at com.android.tools.r8.shaking.m0.a(R8_8.13.6_1c658b3b683138d620220f6965281391a8f410eddb02f3ff35a06caf88d6c59d:1683)
@@ -382,12 +375,15 @@ Missing class javax.annotation.concurrent.GuardedBy (referenced from: com.google
 		at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
 		at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
 		at java.base/java.lang.Thread.run(Thread.java:1583)
-	Caused by: [CIRCULAR REFERENCE: com.android.tools.r8.internal.g: Missing class com.google.errorprone.annotations.CanIgnoreReturnValue (referenced from: com.google.crypto.tink.KeysetManager com.google.crypto.tink.KeysetManager.add(com.google.crypto.tink.KeyTemplate) and 52 other contexts)
-Missing class com.google.errorprone.annotations.CheckReturnValue (referenced from: com.google.crypto.tink.InsecureSecretKeyAccess and 1 other context)
-Missing class com.google.errorprone.annotations.Immutable (referenced from: com.google.crypto.tink.InsecureSecretKeyAccess and 40 other contexts)
-Missing class com.google.errorprone.annotations.RestrictedApi (referenced from: com.google.crypto.tink.aead.AesEaxKey$Builder com.google.crypto.tink.aead.AesEaxKey.builder() and 6 other contexts)
-Missing class javax.annotation.Nullable (referenced from: java.lang.Object com.google.crypto.tink.PrimitiveSet$Entry.fullPrimitive and 86 other contexts)
-Missing class javax.annotation.concurrent.GuardedBy (referenced from: com.google.crypto.tink.proto.Keyset$Builder com.google.crypto.tink.KeysetManager.keysetBuilder and 3 other contexts)]
+	Caused by: [CIRCULAR REFERENCE: com.android.tools.r8.internal.g: Missing class com.google.api.client.http.GenericUrl (referenced from: java.lang.String com.google.crypto.tink.util.KeysDownloader.fetchAndCacheData())
+Missing class com.google.api.client.http.HttpHeaders (referenced from: java.lang.String com.google.crypto.tink.util.KeysDownloader.fetchAndCacheData() and 1 other context)
+Missing class com.google.api.client.http.HttpRequest (referenced from: java.lang.String com.google.crypto.tink.util.KeysDownloader.fetchAndCacheData())
+Missing class com.google.api.client.http.HttpRequestFactory (referenced from: java.lang.String com.google.crypto.tink.util.KeysDownloader.fetchAndCacheData())
+Missing class com.google.api.client.http.HttpResponse (referenced from: java.lang.String com.google.crypto.tink.util.KeysDownloader.fetchAndCacheData())
+Missing class com.google.api.client.http.HttpTransport (referenced from: com.google.api.client.http.HttpTransport com.google.crypto.tink.util.KeysDownloader$Builder.httpTransport and 6 other contexts)
+Missing class com.google.api.client.http.javanet.NetHttpTransport$Builder (referenced from: void com.google.crypto.tink.util.KeysDownloader.<clinit>())
+Missing class com.google.api.client.http.javanet.NetHttpTransport (referenced from: com.google.api.client.http.javanet.NetHttpTransport com.google.crypto.tink.util.KeysDownloader.DEFAULT_HTTP_TRANSPORT and 3 other contexts)
+Missing class org.joda.time.Instant (referenced from: long com.google.crypto.tink.util.KeysDownloader.getCurrentTimeInMillis())]
 
 
 Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
@@ -396,5 +392,5 @@ You can use '--warning-mode all' to show the individual deprecation warnings and
 
 For more on this, please refer to https://docs.gradle.org/8.13/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
 
-BUILD FAILED in 48s
-32 actionable tasks: 32 executed
+BUILD FAILED in 49s
+36 actionable tasks: 36 executed
