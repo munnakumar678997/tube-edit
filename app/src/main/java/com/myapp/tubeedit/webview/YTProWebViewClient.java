@@ -30,6 +30,48 @@ public class YTProWebViewClient extends WebViewClient {
 		this.web = web;
 	}
 	
+	// SECURITY: the "Android" JavaScript bridge (addJavascriptInterface) is exposed to
+	// every page this WebView loads, with no per-origin restriction (a known Android
+	// WebView limitation). Without this check, any external site the user navigates to
+	// (a link in a video description, a comment, an ad, a redirect) could call powerful
+	// native methods like setProxy(), openDownloadedFile(), muxVideoAudio(), etc.
+	// This allowlist keeps untrusted origins from ever loading inside this WebView.
+	private static final String[] ALLOWED_HOSTS = {
+		"youtube.com", "youtu.be", "ytimg.com", "googlevideo.com",
+		"google.com", "gstatic.com", "googleapis.com", "googleusercontent.com",
+		"ggpht.com", "gvt1.com", "gvt2.com", "gvt3.com"
+	};
+
+	private boolean isAllowedHost(String host) {
+		if (host == null) return false;
+		host = host.toLowerCase();
+		for (String allowed : ALLOWED_HOSTS) {
+			if (host.equals(allowed) || host.endsWith("." + allowed)) return true;
+		}
+		return false;
+	}
+
+	@Override
+	public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+		String host = request.getUrl().getHost();
+
+		if (isAllowedHost(host)) {
+			return false; // trusted domain, let the WebView load it (and keep the JS bridge)
+		}
+
+		if (request.isForMainFrame()) {
+			// Untrusted destination for a full page navigation: open in the user's
+			// normal browser instead, where our native JS bridge does not exist.
+			try {
+				Intent intent = new Intent(Intent.ACTION_VIEW, request.getUrl());
+				intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+				activity.startActivity(intent);
+			} catch (Exception ignored) {}
+		}
+		// Untrusted subframe (e.g. an ad iframe): just block it, don't open a browser for it.
+		return true;
+	}
+
 	@Override
 	public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
 		String url = request.getUrl().toString();

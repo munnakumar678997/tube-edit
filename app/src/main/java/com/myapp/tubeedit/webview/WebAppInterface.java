@@ -117,6 +117,11 @@ public class WebAppInterface {
 	
 	@JavascriptInterface
 	public void muxVideoAudio(String videoFileName,String audioFileName,String outputFileName) {
+		// SECURITY: strip any directory components from JS-supplied filenames.
+		videoFileName = new java.io.File(videoFileName).getName();
+		audioFileName = new java.io.File(audioFileName).getName();
+		outputFileName = new java.io.File(outputFileName).getName();
+
 		java.io.File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS.concat("/YTPRO"));
 		java.io.File video  = new java.io.File(downloads, videoFileName);
 		java.io.File audio  = new java.io.File(downloads, audioFileName);
@@ -327,15 +332,20 @@ public class WebAppInterface {
 	public void openDownloadedFile(String filename) {
 		activity.runOnUiThread(() -> {
 			try {
+				// SECURITY: never trust a path from JS directly — strip any directory
+				// components so this can only ever open a file inside our own Downloads
+				// folders, never escape via "../" into other app/OS storage.
+				String safeName = new java.io.File(filename).getName();
+
 				java.io.File root = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
 				java.io.File ytproSub = new java.io.File(root, "YTPRO");
 
-				java.io.File target = new java.io.File(ytproSub, filename);
+				java.io.File target = new java.io.File(ytproSub, safeName);
 				if (!target.exists()) {
-					target = new java.io.File(root, filename);
+					target = new java.io.File(root, safeName);
 				}
 				if (!target.exists()) {
-					Toast.makeText(activity, "File not found: " + filename, Toast.LENGTH_SHORT).show();
+					Toast.makeText(activity, "File not found: " + safeName, Toast.LENGTH_SHORT).show();
 					return;
 				}
 
@@ -370,6 +380,10 @@ public class WebAppInterface {
 	// ---- Audio-only extraction (saves the already-downloaded audio track as its own file) ----
 	@JavascriptInterface
 	public void extractAudioOnly(String audioFileName, String outputFileName) {
+		// SECURITY: strip any directory components from JS-supplied filenames.
+		audioFileName = new java.io.File(audioFileName).getName();
+		outputFileName = new java.io.File(outputFileName).getName();
+
 		java.io.File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS.concat("/YTPRO"));
 		java.io.File audio = new java.io.File(downloads, audioFileName);
 		java.io.File output = new java.io.File(downloads, outputFileName);

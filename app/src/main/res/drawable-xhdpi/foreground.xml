@@ -5,24 +5,24 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Soft rounded backdrop circle for the play glyph -->
+    <!-- Rounded-square badge (distinct from YouTube's pill shape) -->
     <path
-        android:fillColor="#1F2937"
-        android:pathData="M54,20 C72.7777,20 88,35.2223 88,54 C88,72.7777 72.7777,88 54,88 C35.2223,88 20,72.7777 20,54 C20,35.2223 35.2223,20 54,20 Z" />
+        android:fillColor="#C4241F"
+        android:pathData="M32,24 L76,24 C83.732,24 90,30.268 90,38 L90,70 C90,77.732 83.732,84 76,84 L32,84 C24.268,84 18,77.732 18,70 L18,38 C18,30.268 24.268,24 32,24 Z" />
 
     <!-- Play triangle -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M44,38 L72,54 L44,70 Z" />
+        android:pathData="M46,38 L74,54 L46,70 Z" />
 
-    <!-- Accent badge, bottom-right (brand highlight) -->
+    <!-- Small accent notch, bottom-right (distinguishing detail) -->
     <path
-        android:fillColor="#FF7A1A"
+        android:fillColor="#FFFFFF"
         android:pathData="M76,68 C81.5228,68 86,72.4772 86,78 C86,83.5228 81.5228,88 76,88 C70.4772,88 66,83.5228 66,78 C66,72.4772 70.4772,68 76,68 Z" />
     <path
-        android:fillColor="#1F2937"
+        android:fillColor="#C4241F"
         android:pathData="M72,78 L80,78 M76,74 L76,82"
-        android:strokeColor="#1F2937"
+        android:strokeColor="#C4241F"
         android:strokeWidth="2.4"
         android:strokeLineCap="round" />
 </vector>
