@@ -25,7 +25,20 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build
-        run: ./gradlew assembleRelease
+        run: |
+          set -o pipefail
+          ./gradlew assembleRelease --stacktrace 2>&1 | tee build_output.log
+
+      - name: Save build log on failure
+        if: failure()
+        run: |
+          git config user.email "buildbot@tube-edit.local"
+          git config user.name "build-bot"
+          mkdir -p .buildlogs
+          tail -n 400 build_output.log > .buildlogs/last_error.log
+          git add .buildlogs/last_error.log
+          git commit -m "Save build error log [skip ci]" || echo "nothing to commit"
+          git push || echo "push failed"
 
       - name: Sign APK
         run: |
