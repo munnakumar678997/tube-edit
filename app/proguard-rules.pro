@@ -26,7 +26,6 @@
 -dontwarn com.google.errorprone.annotations.**
 -dontwarn javax.annotation.**
 -dontwarn javax.annotation.concurrent.**
--keep class com.google.crypto.tink.** { *; }
 -keepclassmembers class com.myapp.tubeedit.webview.WebAppInterface {
     @android.webkit.JavascriptInterface <methods>;
 }
