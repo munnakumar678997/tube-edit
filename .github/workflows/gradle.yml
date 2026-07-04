@@ -55,12 +55,18 @@ jobs:
           name: tube-edit-apk
           path: app/build/outputs/apk/release/tube-edit-signed.apk
 
+      - name: Extract version name
+        id: ver
+        run: |
+          VNAME=$(grep -oP 'versionName\s+"\K[^"]+' app/build.gradle)
+          echo "version=$VNAME" >> "$GITHUB_OUTPUT"
+
       - name: Publish/Update "latest" release with APK
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
-          name: Latest Build
-          body: "Automatically built APK. Always contains the latest code from main."
+          name: "v${{ steps.ver.outputs.version }}"
+          body: "Automatically built APK — version ${{ steps.ver.outputs.version }}. Always the latest code from main."
           files: app/build/outputs/apk/release/tube-edit-signed.apk
           make_latest: true
         env:

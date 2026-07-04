@@ -559,6 +559,7 @@ var el=e.target.closest("[data-url]");
 if(!el) return;
 
 Android.downvid(el.dataset.title,el.dataset.url,"image/jpg");
+window.ytproRecordDownload?.(safeTitle, el.dataset.title, "thumbnail");
 
 });
 }
@@ -599,6 +600,7 @@ var el=e.target.closest("[data-url]");
 if(!el) return;
 
 Android.downvid(el.dataset.title+el.dataset.ext,el.dataset.url,"plain/text");
+window.ytproRecordDownload?.(safeTitle, el.dataset.title+el.dataset.ext, "caption");
 
 });
 
@@ -681,7 +683,9 @@ if(kind === "thumb"){
 var thumbs = info.basic_info.thumbnail;
 var best = thumbs?.[thumbs.length-1];
 if(!best){ window.Android?.showToast?.('No thumbnail found.'); return; }
-Android.downvid(`${safeTitle} YTPRO.jpg`, best.url, "image/jpg");
+var thumbFileName = `${safeTitle} YTPRO.jpg`;
+Android.downvid(thumbFileName, best.url, "image/jpg");
+window.ytproRecordDownload?.(safeTitle, thumbFileName, "thumbnail");
 return;
 }
 
@@ -695,7 +699,9 @@ for(const f of candidates){
 var url = await getDirectUrl(f, raw.player);
 if(url){
 var ext = (f.mimeType||"").includes("webm") ? "webm" : "mp4";
-Android.downvid(`${safeTitle}_${new Date().getTime()}.${ext}`, url, f.mimeType || "video/mp4");
+var videoFileName = `${safeTitle}_${new Date().getTime()}.${ext}`;
+Android.downvid(videoFileName, url, f.mimeType || "video/mp4");
+window.ytproRecordDownload?.(safeTitle, videoFileName, "video");
 return;
 }
 }
@@ -710,7 +716,9 @@ for(const f of audioCandidates){
 var url = await getDirectUrl(f, raw.player);
 if(url){
 var ext = (f.mimeType||"").includes("webm") ? "weba" : "m4a";
-Android.downvid(`${safeTitle}_audio_${new Date().getTime()}.${ext}`, url, f.mimeType || "audio/mp4");
+var audioFileName2 = `${safeTitle}_audio_${new Date().getTime()}.${ext}`;
+Android.downvid(audioFileName2, url, f.mimeType || "audio/mp4");
+window.ytproRecordDownload?.(safeTitle, audioFileName2, "audio");
 return;
 }
 }
@@ -898,6 +906,7 @@ var {elDetails,elProgress} = createProgreses("Video Stream");
 
 await pipeToDisk(videoStream,fileName, estVideoBytes,elDetails,elProgress);
 
+window.ytproRecordDownload?.(safeTitle, fileName, "video");
 finishDownloaderUI('Video download complete');
 
 }else if(enabledTrack==EnabledTrackTypes.AUDIO_ONLY){
@@ -917,6 +926,7 @@ var fileName=`${safeTitle}_audio${new Date().getTime()}.${containerExt}`;
 
 await pipeToDisk(audioStream,fileName, estAudioBytes,elDetails,elProgress);
 
+window.ytproRecordDownload?.(safeTitle, fileName, "audio");
 finishDownloaderUI('Audio download complete');
 
 }else if(enabledTrack==EnabledTrackTypes.VIDEO_AND_AUDIO){
@@ -959,8 +969,9 @@ await Promise.all(downloadTasks);
 
 window.Android.showToast('Muxing formats...');
 
-window.Android?.muxVideoAudio?.(videoFileName,audioFileName,`${safeTitle}_${new Date().getTime()}.${containerExt 
-}`);
+var muxedOutputFileName = `${safeTitle}_${new Date().getTime()}.${containerExt}`;
+window.Android?.muxVideoAudio?.(videoFileName,audioFileName,muxedOutputFileName);
+window.ytproRecordDownload?.(safeTitle, muxedOutputFileName, "video");
 
 finishDownloaderUI();
 
@@ -968,7 +979,17 @@ finishDownloaderUI();
 
 }catch(err){
 console.error('[YTPRO] Download failed:', err);
-finishDownloaderUI('Download failed: ' + (err?.message || 'unknown error'));
+finishDownloaderUI('Advanced download failed — switched to Quick Download, tap a button there to try the reliable method.');
+
+try{
+var tabsBar = document.querySelector('[data-view="#quickViewDiv"]')?.parentElement;
+if(tabsBar){
+[...tabsBar.children].forEach(child => child.style.background = "transparent");
+document.querySelectorAll('[id$="ViewDiv"]').forEach(v => v.style.display = "none");
+document.querySelector('[data-view="#quickViewDiv"]').style.background = d;
+document.querySelector("#quickViewDiv").style.display = "block";
+}
+}catch(e){}
 }
 
 

@@ -63,6 +63,16 @@ localStorage.setItem("geminiModel","3.0 Flash");
 localStorage.setItem("prompt","Give me details about this YouTube video Id: {videoId} , a detailed summary of timestamps with facts , resources and reviews of the main content");
 localStorage.setItem("devMode","false");
 localStorage.setItem("proxyOn","false");
+localStorage.setItem("loopVid","false");
+
+window.ytproRecordDownload = function(title, filename, type){
+try{
+var history = JSON.parse(localStorage.getItem("ytproDownloadHistory") || "[]");
+history.unshift({ title: title, filename: filename, type: type, date: Date.now() });
+if(history.length > 200) history = history.slice(0, 200);
+localStorage.setItem("ytproDownloadHistory", JSON.stringify(history));
+}catch(e){ console.error('[YTPRO] recordDownload failed', e); }
+};
 
 localStorage.setItem("block_60fps","false");
 
@@ -449,6 +459,28 @@ setTimeout(()=>{sSDiv.remove();},5000);
 
 
 fDislikes(window.location.href);
+
+// ---- Lightweight update check (notify-only, checks at most once per day) ----
+(function checkForAppUpdate(){
+  try{
+    var lastCheck = parseInt(localStorage.getItem("ytproLastUpdateCheck") || "0");
+    var now = Date.now();
+    if(now - lastCheck < 24*60*60*1000) return; // once per day max
+    localStorage.setItem("ytproLastUpdateCheck", String(now));
+
+    fetch("https://api.github.com/repos/munnakumar678997/tube-edit/releases/latest")
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if(!data || !data.name) return;
+        var latest = data.name.replace(/^v/i, "").trim();
+        var current = YTProVer;
+        if(latest && latest !== current){
+          window.Android?.showToast?.("Tube Edit update available: v" + latest + " — check GitHub to download.");
+        }
+      })
+      .catch(()=>{});
+  }catch(e){}
+})();
 checkSponsors(window.location.href);
 
 
@@ -459,6 +491,7 @@ var unV=setInterval(() => {
 /*Unmute The Video*/ 
 
 document.getElementsByClassName('video-stream')[0].muted=false;
+document.getElementsByClassName('video-stream')[0].loop = localStorage.getItem("loopVid") === "true";
 
 if(!document.getElementsByClassName('video-stream')[0].muted){
 clearInterval(unV);
@@ -779,6 +812,14 @@ ytpSetI.innerHTML+=`<br><b style='font-size:18px' >Tube Edit Settings</b>
 <br>
 <div>Use single Gemini chat <span data-action="sttCnf" data-value="saveCInfo" style="${sttCnf(0,0,"saveCInfo")}" ><b style="${sttCnf(0,1,"saveCInfo")}"></b></span></div>
 <br>
+<div>Loop Current Video <span data-action="sttCnf" data-value="loopVid" style="${sttCnf(0,0,"loopVid")}" ><b style="${sttCnf(0,1,"loopVid")}"></b></span></div>
+<br>
+<button data-action="sleepTimer">Sleep Timer: <span id="sleepTimerLabel">Off</span>
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="${isD ? "#ccc" : "#444"}" viewBox="0 0 16 16">
+<path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708"/>
+</svg>
+</button>
+<br>
 <button data-action="geminiModels">Select Gemini Model
 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="${isD ? "#ccc" : "#444"}" viewBox="0 0 16 16">
 <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708"/>
@@ -800,6 +841,12 @@ ytpSetI.innerHTML+=`<br><b style='font-size:18px' >Tube Edit Settings</b>
 <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708"/>
 </svg>
 </button>
+<br><br>
+<div style="display:flex;align-items:center;justify-content:space-between;width:calc(100% - 20px);margin:auto;">
+<b style="font-size:14px;">Download History</b>
+<span data-action="clearDownloadHistory" style="font-size:12px;color:${isD ? "#ccc" : "#444"};text-decoration:underline;">Clear All</span>
+</div>
+<div id="ytproDownloadHistoryList" style="text-align:left;margin-top:8px;"></div>
 </div>
 
 <div class="ytproSettingsPane" data-pane="privacy">
@@ -821,6 +868,18 @@ ytpSetI.innerHTML+=`<br><b style='font-size:18px' >Tube Edit Settings</b>
 </div>
 
 <div class="ytproSettingsPane" data-pane="about">
+<div style="text-align:left;width:calc(100% - 20px);margin:auto;">
+<b style="font-size:14px;">What's New — v${YTProVer}</b>
+<ul style="font-size:12px;color:${isD ? "#bbb" : "#555"};padding-left:18px;margin-top:8px;">
+<li>Quick Download tab — reliable direct video/audio/thumbnail download</li>
+<li>Download Entire Playlist (bulk download)</li>
+<li>Download History &amp; file manager in Downloads tab</li>
+<li>Sleep Timer &amp; Loop Current Video in Playback</li>
+<li>Cookie/cache/history clear + optional proxy in Privacy</li>
+<li>Encrypted local storage, new icon &amp; splash screen</li>
+</ul>
+</div>
+<br>
 <p style="font-size:1.25rem;width:calc(100% - 20px);margin:auto;text-align:left"><b style="font-weight:bold">Disclaimer</b>: This is an educational project aimed at showcasing javascript injection into a webview to enhance productivity.
 <br><br></p>
 <div style="text-align:center;color:#aaa;">Made with ❤ by Munna Agent</div>
@@ -894,6 +953,49 @@ var actionsList={
     localStorage.setItem('geminiModel',value);
     el.parentElement.style.display='none';
   },
+  sleepTimer:()=>{
+    var existing = document.getElementById('ytproSleepMenu');
+    if(existing){ existing.remove(); return; }
+
+    var menu = document.createElement('div');
+    menu.id = 'ytproSleepMenu';
+    menu.style.cssText = `position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:${isD ? "#212121" : "#f1f1f1"};border-radius:15px;padding:10px;z-index:999999999999999;box-shadow:0 0 10px rgba(0,0,0,.5);text-align:center;`;
+
+    var options = [["Off",0],["15 min",15],["30 min",30],["45 min",45],["60 min",60]];
+    options.forEach(([label,mins])=>{
+      var b = document.createElement('button');
+      b.textContent = label;
+      b.style.cssText = `display:block;width:150px;margin:4px auto;padding:8px;border:0;border-radius:20px;background:${isD ? "rgba(255,255,255,.1)" : "rgba(0,0,0,.1)"};color:${isD ? "#fff" : "#000"};`;
+      b.addEventListener('click', ()=>{
+        if(window.__ytproSleepTimeout) clearTimeout(window.__ytproSleepTimeout);
+        var label2 = document.getElementById('sleepTimerLabel');
+        if(mins === 0){
+          if(label2) label2.textContent = "Off";
+          window.Android?.showToast?.('Sleep timer cancelled');
+        } else {
+          window.__ytproSleepTimeout = setTimeout(()=>{
+            var v = document.getElementsByClassName('video-stream')[0];
+            if(v) v.pause();
+            Android?.setBgPlay?.(false);
+            window.Android?.showToast?.('Sleep timer: playback paused');
+            var label3 = document.getElementById('sleepTimerLabel');
+            if(label3) label3.textContent = "Off";
+          }, mins * 60 * 1000);
+          if(label2) label2.textContent = mins + " min";
+          window.Android?.showToast?.('Sleep timer set: ' + mins + ' min');
+        }
+        menu.remove();
+      });
+      menu.appendChild(b);
+    });
+
+    document.body.appendChild(menu);
+  },
+  clearDownloadHistory:()=>{
+    localStorage.setItem("ytproDownloadHistory", "[]");
+    var list = document.getElementById("ytproDownloadHistoryList");
+    if(list) list.innerHTML = `<p style="font-size:12px;color:${isD ? "#888" : "#777"};">No downloads yet.</p>`;
+  },
   clearBrowsingData:()=>{
     window.Android?.clearBrowsingData?.();
   },
@@ -929,7 +1031,47 @@ ytpSetI.querySelector(".ytproSettingsTabs").addEventListener("click",(e)=>{
   ytpSetI.querySelectorAll(".ytproSettingsPane").forEach(p=>p.classList.remove("active"));
   el.classList.add("active");
   ytpSetI.querySelector(`.ytproSettingsPane[data-pane="${el.dataset.tab}"]`).classList.add("active");
+  if(el.dataset.tab === "downloads") renderDownloadHistory();
 });
+
+function renderDownloadHistory(){
+  var list = ytpSetI.querySelector("#ytproDownloadHistoryList");
+  if(!list) return;
+  var history = JSON.parse(localStorage.getItem("ytproDownloadHistory") || "[]");
+
+  if(!history.length){
+    list.innerHTML = `<p style="font-size:12px;color:${isD ? "#888" : "#777"};">No downloads yet.</p>`;
+    return;
+  }
+
+  list.innerHTML = history.map((item, idx) => `
+    <div style="display:flex;align-items:center;justify-content:space-between;background:${isD ? "rgba(255,255,255,.05)" : "rgba(0,0,0,.05)"};border-radius:12px;padding:8px 10px;margin-bottom:6px;">
+      <div style="overflow:hidden;flex:1;margin-right:8px;">
+        <div style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item.title}</div>
+        <div style="font-size:10px;color:${isD ? "#999" : "#666"};">${item.type} · ${new Date(item.date).toLocaleString()}</div>
+      </div>
+      <button data-hist-open="${idx}" style="border:0;border-radius:15px;padding:5px 10px;background:${c};color:${dc};font-size:11px;margin-right:5px;">Open</button>
+      <button data-hist-del="${idx}" style="border:0;border-radius:15px;padding:5px 10px;background:${isD ? "rgba(255,255,255,.1)" : "rgba(0,0,0,.1)"};font-size:11px;">✕</button>
+    </div>
+  `).join("");
+
+  list.querySelectorAll("[data-hist-open]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      var item = history[parseInt(btn.dataset.histOpen)];
+      window.Android?.openDownloadedFile?.(item.filename);
+    });
+  });
+  list.querySelectorAll("[data-hist-del]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      history.splice(parseInt(btn.dataset.histDel), 1);
+      localStorage.setItem("ytproDownloadHistory", JSON.stringify(history));
+      renderDownloadHistory();
+    });
+  });
+}
+
+renderDownloadHistory();
+
 
 
 //disable Codecs
@@ -1038,6 +1180,10 @@ if(localStorage.getItem("bgplay") == "true"){
 Android.setBgPlay(true);
 }else{
 Android.setBgPlay(false);
+}
+
+if(document.getElementsByClassName('video-stream')[0]){
+document.getElementsByClassName('video-stream')[0].loop = localStorage.getItem("loopVid") === "true";
 }
 
 

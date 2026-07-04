@@ -322,6 +322,51 @@ public class WebAppInterface {
 		return SecurePrefs.getString(activity, key, "");
 	}
 
+	// ---- Download history: open a previously downloaded file with the system viewer ----
+	@JavascriptInterface
+	public void openDownloadedFile(String filename) {
+		activity.runOnUiThread(() -> {
+			try {
+				java.io.File root = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+				java.io.File ytproSub = new java.io.File(root, "YTPRO");
+
+				java.io.File target = new java.io.File(ytproSub, filename);
+				if (!target.exists()) {
+					target = new java.io.File(root, filename);
+				}
+				if (!target.exists()) {
+					Toast.makeText(activity, "File not found: " + filename, Toast.LENGTH_SHORT).show();
+					return;
+				}
+
+				Uri uri = androidx.core.content.FileProvider.getUriForFile(
+						activity, "com.myapp.tubeedit.fileprovider", target);
+
+				String mime = guessMimeType(filename);
+
+				Intent intent = new Intent(Intent.ACTION_VIEW);
+				intent.setDataAndType(uri, mime);
+				intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+				intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+				activity.startActivity(Intent.createChooser(intent, "Open with"));
+			} catch (Exception e) {
+				Toast.makeText(activity, "Could not open file: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+			}
+		});
+	}
+
+	private String guessMimeType(String filename) {
+		String lower = filename.toLowerCase();
+		if (lower.endsWith(".mp4")) return "video/mp4";
+		if (lower.endsWith(".webm")) return "video/webm";
+		if (lower.endsWith(".m4a")) return "audio/mp4";
+		if (lower.endsWith(".weba")) return "audio/webm";
+		if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+		if (lower.endsWith(".png")) return "image/png";
+		return "*/*";
+	}
+
 	// ---- Audio-only extraction (saves the already-downloaded audio track as its own file) ----
 	@JavascriptInterface
 	public void extractAudioOnly(String audioFileName, String outputFileName) {
