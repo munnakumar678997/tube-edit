@@ -215,6 +215,10 @@ const rawAdaptive = streamingData.adaptive_formats || [];
 const preMuxed = rawFormats.map(cleanFormat);
 const adaptive = rawAdaptive.map(cleanFormat);
 
+// Keep raw format objects so we can decipher a direct, non-SABR URL for the
+// simple "Quick Download" path (these avoid the SABR streaming protocol entirely).
+window.__ytproRawFormats = { formats: rawFormats, adaptiveFormats: rawAdaptive, player };
+
 // Filter adaptive for matching
 const videoOnly = adaptive.filter(f => f.hasVideo && !f.hasAudio);
 const audioOnly = adaptive.filter(f => f.hasAudio && !f.hasVideo);
@@ -641,6 +645,84 @@ updateMuxFormats();
 updateAudioOnlyFormats();
 updateVideoOnlyFormats(); 
 }
+function updateQuickDownload(){
+var div=ytproDownDiv.querySelector("#quickViewDiv");
+div.innerHTML=`<style>
+.qkBtn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:45px;border-radius:22px;margin-bottom:10px;background:${d};border:0;font-size:15px;}
+.qkNote{font-size:12px;color:${isD ? "#999" : "#666"};margin-top:10px;}
+</style>`;
+
+div.innerHTML += `
+<button class="qkBtn" data-qk="video">⬇ Download Video (MP4)</button>
+<button class="qkBtn" data-qk="audio">⬇ Download Audio</button>
+<button class="qkBtn" data-qk="thumb">⬇ Download Thumbnail</button>
+<div class="qkNote">Quick Download picks the most reliable direct format automatically. For a specific resolution or WEBM, use the "Formats" tab.</div>
+`;
+
+async function getDirectUrl(rawFormat, playerObj){
+if(!rawFormat) return null;
+try{
+if(rawFormat.url) return rawFormat.url;
+var cipher = rawFormat.signature_cipher || rawFormat.signatureCipher;
+if(cipher && playerObj?.decipher){
+return await playerObj.decipher(cipher);
+}
+}catch(e){ console.error('[YTPRO] getDirectUrl failed', e); }
+return null;
+}
+
+div.addEventListener("click", async (e)=>{
+var el = e.target.closest("[data-qk]");
+if(!el) return;
+var kind = el.dataset.qk;
+var raw = window.__ytproRawFormats;
+
+if(kind === "thumb"){
+var thumbs = info.basic_info.thumbnail;
+var best = thumbs?.[thumbs.length-1];
+if(!best){ window.Android?.showToast?.('No thumbnail found.'); return; }
+Android.downvid(`${safeTitle} YTPRO.jpg`, best.url, "image/jpg");
+return;
+}
+
+if(!raw){ window.Android?.showToast?.('Format data not ready, please reopen download menu.'); return; }
+
+if(kind === "video"){
+// Prefer progressive (video+audio already combined) formats — no SABR, no local muxing needed.
+var candidates = (raw.formats || []).slice().sort((a,b)=>(b.bitrate||0)-(a.bitrate||0));
+window.Android?.showToast?.('Preparing video...');
+for(const f of candidates){
+var url = await getDirectUrl(f, raw.player);
+if(url){
+var ext = (f.mimeType||"").includes("webm") ? "webm" : "mp4";
+Android.downvid(`${safeTitle}_${new Date().getTime()}.${ext}`, url, f.mimeType || "video/mp4");
+return;
+}
+}
+window.Android?.showToast?.('No quick-download format available for this video — try the "Formats" tab for HD download.');
+return;
+}
+
+if(kind === "audio"){
+var audioCandidates = (raw.adaptiveFormats || []).filter(f => (f.mimeType||"").startsWith("audio/")).sort((a,b)=>(b.bitrate||0)-(a.bitrate||0));
+window.Android?.showToast?.('Preparing audio...');
+for(const f of audioCandidates){
+var url = await getDirectUrl(f, raw.player);
+if(url){
+var ext = (f.mimeType||"").includes("webm") ? "weba" : "m4a";
+Android.downvid(`${safeTitle}_audio_${new Date().getTime()}.${ext}`, url, f.mimeType || "audio/mp4");
+return;
+}
+}
+window.Android?.showToast?.('No quick-download audio available — try the "Formats" tab.');
+return;
+}
+});
+
+}
+
+
+updateQuickDownload();
 updateThumbnails();
 updateCaptions();
 
@@ -917,6 +999,7 @@ if (!ytproDownDiv.contains(ev.target)) history.back();
 
 // Build tabs declaratively
 const TABS = [
+{ label: "Quick",      viewId: "quickViewDiv"    },
 { label: "Formats",    viewId: "videoViewDiv"    },
 { label: "Thumbnails", viewId: "thumbViewDiv"    },
 { label: "Captions",   viewId: "captionsViewDiv" },
@@ -924,9 +1007,10 @@ const TABS = [
 
 const tabStyle = {
 height: "100%",
-width: "calc((100% - 10px) / 3)",
+width: "calc((100% - 15px) / 4)",
 borderRadius: "25px",
-lineHeight: "30px"
+lineHeight: "30px",
+fontSize: "12px"
 };
 
 const tabs = document.createElement("div");
@@ -968,7 +1052,7 @@ ytproDown.appendChild(ytproDownDiv);
 ytproDownDiv.prepend(tabs); // tabs sit above views
 
 tabs.children[0].style.background=d;
-document.querySelector("#videoViewDiv").style.display = "block"
+document.querySelector("#quickViewDiv").style.display = "block"
 
 return ytproDownDiv;
 }
