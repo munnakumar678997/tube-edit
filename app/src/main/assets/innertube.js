@@ -873,6 +873,16 @@ return {elDetails,elProgress};
 
 
 
+function finishDownloaderUI(message){
+var indicator = document.querySelector("#ytproDownloadIndicator");
+if(indicator) indicator.remove();
+var panel = document.querySelector("#ytProDownloaderDiv");
+if(panel) panel.style.display = "none";
+if(message) window.Android?.showToast?.(message);
+}
+
+try{
+
 //video only
 if(enabledTrack==EnabledTrackTypes.VIDEO_ONLY){
 
@@ -888,7 +898,7 @@ var {elDetails,elProgress} = createProgreses("Video Stream");
 
 await pipeToDisk(videoStream,fileName, estVideoBytes,elDetails,elProgress);
 
-
+finishDownloaderUI('Video download complete');
 
 }else if(enabledTrack==EnabledTrackTypes.AUDIO_ONLY){
 //audio only 
@@ -907,7 +917,7 @@ var fileName=`${safeTitle}_audio${new Date().getTime()}.${containerExt}`;
 
 await pipeToDisk(audioStream,fileName, estAudioBytes,elDetails,elProgress);
 
-
+finishDownloaderUI('Audio download complete');
 
 }else if(enabledTrack==EnabledTrackTypes.VIDEO_AND_AUDIO){
 //both 
@@ -952,6 +962,13 @@ window.Android.showToast('Muxing formats...');
 window.Android?.muxVideoAudio?.(videoFileName,audioFileName,`${safeTitle}_${new Date().getTime()}.${containerExt 
 }`);
 
+finishDownloaderUI();
+
+}
+
+}catch(err){
+console.error('[YTPRO] Download failed:', err);
+finishDownloaderUI('Download failed: ' + (err?.message || 'unknown error'));
 }
 
 
