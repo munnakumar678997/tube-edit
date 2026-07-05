@@ -1412,6 +1412,11 @@ if(e.destination.url.indexOf("watch") > -1 || e.destination.url.indexOf("shorts"
   dislikes="...";
 fDislikes(e.destination.url);
 checkSponsors(e.destination.url);
+}else{
+// Remember the last non-video page the user was on (home feed, search
+// results, a channel page, etc.) so the miniplayer can restore exactly
+// that page instead of always falling back to the homepage.
+try{ sessionStorage.setItem("ytproLastFeedUrl", e.destination.url); }catch(err){}
 }
 });
 
@@ -1436,7 +1441,7 @@ display:none;
 `);
 
 
-iframe.src="https://m.youtube.com/";
+iframe.src = sessionStorage.getItem("ytproLastFeedUrl") || "https://m.youtube.com/";
 document.body.appendChild(iframe);
 
 
@@ -1498,39 +1503,142 @@ try{ ytproCreateMiniIframe(); }catch(e){}
 }
 
 
+var ytproMiniPos = { corner: 'bottom-right' }; // remembers last chosen corner
+window.ytproIsMinimized = false;
+
+function ytproMiniCornerStyle(corner, w, h){
+var margin = 12;
+var styles = { top:'auto', left:'auto', right:'auto', bottom:'auto' };
+if(corner.includes('top')) styles.top = margin + 'px'; else styles.bottom = margin + 'px';
+if(corner.includes('left')) styles.left = margin + 'px'; else styles.right = margin + 'px';
+return styles;
+}
+
+function ytproMakeDraggable(player){
+var dragging = false, startX=0, startY=0, startLeft=0, startTop=0;
+
+function onStart(e){
+if(!window.ytproIsMinimized) return;
+dragging = true;
+var t = e.touches ? e.touches[0] : e;
+startX = t.clientX; startY = t.clientY;
+var rect = player.getBoundingClientRect();
+startLeft = rect.left; startTop = rect.top;
+player.style.transition = 'none'; // no lag while actively dragging
+}
+
+function onMove(e){
+if(!dragging) return;
+e.preventDefault();
+var t = e.touches ? e.touches[0] : e;
+var dx = t.clientX - startX;
+var dy = t.clientY - startY;
+
+player.style.left = (startLeft + dx) + 'px';
+player.style.top = (startTop + dy) + 'px';
+player.style.right = 'auto';
+player.style.bottom = 'auto';
+}
+
+function onEnd(){
+if(!dragging) return;
+dragging = false;
+player.style.transition = 'top .25s ease, left .25s ease, right .25s ease, bottom .25s ease, transform .3s ease';
+
+// snap to whichever corner is nearest
+var rect = player.getBoundingClientRect();
+var midX = rect.left + rect.width/2;
+var midY = rect.top + rect.height/2;
+var corner = (midY < window.innerHeight/2 ? 'top' : 'bottom') + '-' + (midX < window.innerWidth/2 ? 'left' : 'right');
+ytproMiniPos.corner = corner;
+
+var styles = ytproMiniCornerStyle(corner);
+Object.assign(player.style, styles);
+}
+
+player.addEventListener('touchstart', onStart, {passive:true});
+player.addEventListener('touchmove', onMove, {passive:false});
+player.addEventListener('touchend', onEnd, {passive:true});
+player.__ytproDraggableBound = true;
+}
+
+
 function minimize(yes){
 
 
 var iframe = document.getElementById("miniIframe") || ytproCreateMiniIframe();
 var player=document.getElementById("player-container-id");
 
+// Always keep the background pointed at whatever real page the user was
+// last on (home feed / search results / channel, etc.) — refresh it only
+// if it actually changed, so we don't reload the same page needlessly.
+var wantedUrl = sessionStorage.getItem("ytproLastFeedUrl") || "https://m.youtube.com/";
+if(iframe.dataset.loadedUrl !== wantedUrl){
+iframe.src = wantedUrl;
+iframe.dataset.loadedUrl = wantedUrl;
+}
 
+// Smooth animated shrink/grow instead of an instant jump.
+player.style.transition = 'top .3s ease, left .3s ease, right .3s ease, bottom .3s ease, transform .3s ease, width .3s ease, height .3s ease';
 
-
-//var ogCss=getComputedStyle(player);
+if(!player.__ytproDraggableBound){
+ytproMakeDraggable(player);
+}
 
 if(yes){
 
 iframe.style.display="block";
 
+var w = Math.round(window.innerWidth * 0.45);
+var h = Math.round(w * 9/16);
 
-player.setAttribute("ogTop",getComputedStyle(player).top)
+player.setAttribute("ogTop",getComputedStyle(player).top);
 
+player.style.position = 'fixed';
+player.style.width = w + 'px';
+player.style.height = h + 'px';
+player.style.transform = 'scale(1)';
+player.style.zIndex = "9999";
+player.style.borderRadius = '10px';
+player.style.overflow = 'hidden';
+player.style.boxShadow = '0 2px 12px rgba(0,0,0,.5)';
 
-player.style.transform="scale(0.65)";
-player.style.top=(window.screen.height-(player.getBoundingClientRect().height*2.5))+"px";
-player.style.zIndex="9999";
+Object.assign(player.style, ytproMiniCornerStyle(ytproMiniPos.corner));
 
+if(!document.getElementById('ytproMiniClose')){
+var closeBtn = document.createElement('div');
+closeBtn.id = 'ytproMiniClose';
+closeBtn.innerHTML = '&#10005;';
+closeBtn.style.cssText = 'position:absolute;top:4px;right:4px;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;font-size:14px;display:flex;align-items:center;justify-content:center;z-index:10000;';
+closeBtn.addEventListener('click', (e)=>{
+e.stopPropagation();
+var v = document.getElementsByClassName('video-stream')[0];
+if(v) v.pause();
+minimize(false);
+closeBtn.remove();
+});
+player.appendChild(closeBtn);
+}
 
 }else{
+
+var existingClose = document.getElementById('ytproMiniClose');
+if(existingClose) existingClose.remove();
 
 iframe.style.display="none";
 
 
-
-player.style.transform="scale(1)";
+player.style.position = '';
+player.style.width = '';
+player.style.height = '';
 player.style.top=player.getAttribute("ogTop");
+player.style.left = '';
+player.style.right = '';
+player.style.bottom = '';
+player.style.transform="scale(1)";
 player.style.zIndex="normal";
+player.style.borderRadius = '';
+player.style.boxShadow = '';
 
 player.removeAttribute("ogTop");
 
