@@ -1316,12 +1316,26 @@ var scale=1;
 
 /*Checks the Direction of the Swipe*/
 function checkDirection(e) {
+// Once minimized, dragging is handled entirely by ytproMakeDraggable() for
+// repositioning only — a vertical swipe here must NOT also restore/resize
+// the player (that caused the "jumps to portrait/rotate" glitch).
+if(window.ytproIsMinimized) return;
+
 if ((touchendY > touchstartY) && (touchendY - touchstartY > 20)) {
 minimize(true);
 }else if ((touchendY < touchstartY) && (touchstartY - touchendY > 20)) {
 minimize(false);
 //console.log((touchstartY - touchendY ))
+}else if(window.__ytproDragProgress){
+// Drag didn't reach the threshold — smoothly snap back to full size
+// instead of leaving it stuck at a partial scale.
+var player = document.getElementById("player-container-id");
+if(player){
+player.style.transition = 'transform .25s ease';
+player.style.transform = 'scale(1)';
 }
+}
+window.__ytproDragProgress = 0;
 }
 
 /*for zoom in and out*/
@@ -1374,6 +1388,24 @@ addMaxButton();
 
 
 
+}
+
+// Live drag-follow for swipe-down-to-minimize: track the finger in real
+// time instead of only snapping on release (fixes the "jhatka" feeling).
+if(e.touches.length === 1 && !window.ytproIsMinimized && !document.fullscreenElement && localStorage.getItem("gesM") == "true"){
+var tgt = e.target;
+if(tgt.className && (tgt.className.toString().includes("video-stream") || tgt.className.toString().includes("player-controls-background"))){
+var dy = e.touches[0].screenY - touchstartY;
+if(dy > 0){
+var player = document.getElementById("player-container-id");
+if(player){
+var progress = Math.min(dy / 260, 1);
+player.style.transition = 'none';
+player.style.transform = `scale(${1 - progress*0.35})`;
+window.__ytproDragProgress = progress;
+}
+}
+}
 }
 },{capture:true});
 
@@ -1442,6 +1474,7 @@ display:none;
 
 
 iframe.src = sessionStorage.getItem("ytproLastFeedUrl") || "https://m.youtube.com/";
+iframe.dataset.loadedUrl = iframe.src;
 document.body.appendChild(iframe);
 
 
@@ -1515,11 +1548,12 @@ return styles;
 }
 
 function ytproMakeDraggable(player){
-var dragging = false, startX=0, startY=0, startLeft=0, startTop=0;
+var dragging = false, startX=0, startY=0, startLeft=0, startTop=0, moved=0;
 
 function onStart(e){
 if(!window.ytproIsMinimized) return;
 dragging = true;
+moved = 0;
 var t = e.touches ? e.touches[0] : e;
 startX = t.clientX; startY = t.clientY;
 var rect = player.getBoundingClientRect();
@@ -1533,6 +1567,7 @@ e.preventDefault();
 var t = e.touches ? e.touches[0] : e;
 var dx = t.clientX - startX;
 var dy = t.clientY - startY;
+moved = Math.max(moved, Math.abs(dx), Math.abs(dy));
 
 player.style.left = (startLeft + dx) + 'px';
 player.style.top = (startTop + dy) + 'px';
@@ -1540,10 +1575,18 @@ player.style.right = 'auto';
 player.style.bottom = 'auto';
 }
 
-function onEnd(){
+function onEnd(e){
 if(!dragging) return;
 dragging = false;
 player.style.transition = 'top .25s ease, left .25s ease, right .25s ease, bottom .25s ease, transform .3s ease';
+
+// Barely moved? Treat it as a tap — restore to full size (real YouTube's
+// mini player expands when tapped, not swiped).
+if(moved < 10){
+if(e.target && e.target.id === 'ytproMiniClose') return; // close button handles itself
+minimize(false);
+return;
+}
 
 // snap to whichever corner is nearest
 var rect = player.getBoundingClientRect();
@@ -1587,6 +1630,7 @@ ytproMakeDraggable(player);
 
 if(yes){
 
+window.ytproIsMinimized = true;
 iframe.style.display="block";
 
 var w = Math.round(window.innerWidth * 0.45);
@@ -1622,6 +1666,7 @@ player.appendChild(closeBtn);
 
 }else{
 
+window.ytproIsMinimized = false;
 var existingClose = document.getElementById('ytproMiniClose');
 if(existingClose) existingClose.remove();
 
