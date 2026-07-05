@@ -2390,6 +2390,9 @@ return false;
 
 
 ///PIP MODE CONFIG
+var ytproPipOriginalParent = null;
+var ytproPipOriginalNextSibling = null;
+
 function removePIP(){
 
 isPIP=false;
@@ -2397,6 +2400,18 @@ pauseAllowed = true;
 try{ if(document.fullscreenElement) document.exitFullscreen(); }catch(e){}
 
 var v=document.getElementsByClassName('video-stream')[0];
+
+// Move the video back to exactly where it was in the page before PIP.
+if(ytproPipOriginalParent){
+  if(ytproPipOriginalNextSibling && ytproPipOriginalNextSibling.parentNode === ytproPipOriginalParent){
+    ytproPipOriginalParent.insertBefore(v, ytproPipOriginalNextSibling);
+  } else {
+    ytproPipOriginalParent.appendChild(v);
+  }
+  ytproPipOriginalParent = null;
+  ytproPipOriginalNextSibling = null;
+}
+
 v.style.position = '';
 v.style.top = '';
 v.style.left = '';
@@ -2435,14 +2450,23 @@ return;
 }
 
 
-// Fill the PIP window with the video using plain CSS — this works even when
-// PIP was triggered by the Home button (no prior user gesture), unlike
-// requestFullscreen() alone, which silently fails without one.
+// Move the video element directly under <body>. Several ancestor elements
+// in YouTube's own player DOM use CSS transforms, which silently break
+// position:fixed (it becomes relative to the transformed ancestor instead
+// of the viewport). Re-parenting to <body> guarantees the video actually
+// fills the PIP window regardless of what triggered PIP mode.
+if(v.parentNode && v.parentNode !== document.body){
+  ytproPipOriginalParent = v.parentNode;
+  ytproPipOriginalNextSibling = v.nextSibling;
+  document.body.appendChild(v);
+}
+
 v.style.position = 'fixed';
 v.style.top = '0';
 v.style.left = '0';
 v.style.width = '100vw';
 v.style.height = '100vh';
+v.style.margin = '0';
 v.style.zIndex = '2147483647';
 v.style.objectFit = 'contain';
 v.style.background = '#000';
