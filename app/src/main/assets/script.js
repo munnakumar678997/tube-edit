@@ -2394,11 +2394,21 @@ function removePIP(){
 
 isPIP=false;
 pauseAllowed = true;
-document.exitFullscreen();
- 
-document.getElementsByClassName('video-stream')[0].pause();
+try{ if(document.fullscreenElement) document.exitFullscreen(); }catch(e){}
+
+var v=document.getElementsByClassName('video-stream')[0];
+v.style.position = '';
+v.style.top = '';
+v.style.left = '';
+v.style.width = '';
+v.style.height = '';
+v.style.zIndex = '';
+v.style.objectFit = '';
+v.style.background = '';
+
+v.pause();
 setTimeout(()=>{
-document.getElementsByClassName('video-stream')[0].play();
+v.play();
 },5);
 
 
@@ -2425,7 +2435,19 @@ return;
 }
 
 
-v.requestFullscreen();
+// Fill the PIP window with the video using plain CSS — this works even when
+// PIP was triggered by the Home button (no prior user gesture), unlike
+// requestFullscreen() alone, which silently fails without one.
+v.style.position = 'fixed';
+v.style.top = '0';
+v.style.left = '0';
+v.style.width = '100vw';
+v.style.height = '100vh';
+v.style.zIndex = '2147483647';
+v.style.objectFit = 'contain';
+v.style.background = '#000';
+
+try{ v.requestFullscreen().catch(()=>{}); }catch(e){}
 v.play();
 pauseAllowed = false;
 isPIP=true;
