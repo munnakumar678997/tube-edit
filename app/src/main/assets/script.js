@@ -65,6 +65,7 @@ localStorage.setItem("devMode","false");
 localStorage.setItem("proxyOn","false");
 localStorage.setItem("loopVid","false");
 localStorage.setItem("autoPip","true");
+if(!localStorage.getItem("ytproPreferredQuality")) localStorage.setItem("ytproPreferredQuality","144p");
 
 window.ytproRecordDownload = function(title, filename, type, thumbUrl, durationSec, videoId){
 try{
@@ -811,6 +812,18 @@ ytpSetI.innerHTML+=`<br><b style='font-size:18px' >Tube Edit Settings</b>
 <br>
 <div>Auto PIP on Minimize <span data-action="sttCnf" data-value="autoPip" style="${sttCnf(0,0,"autoPip")}" ><b style="${sttCnf(0,1,"autoPip")}" ></b></span></div> 
 <br>
+<div style="display:flex;align-items:center;justify-content:space-between;width:calc(100% - 20px);margin:auto;">
+<span>Preferred Video Quality</span>
+<select id="ytproQualitySelect" style="background:${isD ? "#333" : "#eee"};color:${isD ? "#fff" : "#000"};border:0;border-radius:8px;padding:4px 8px;">
+<option value="144p" ${localStorage.getItem("ytproPreferredQuality")==="144p"||!localStorage.getItem("ytproPreferredQuality")?"selected":""}>144p</option>
+<option value="240p" ${localStorage.getItem("ytproPreferredQuality")==="240p"?"selected":""}>240p</option>
+<option value="360p" ${localStorage.getItem("ytproPreferredQuality")==="360p"?"selected":""}>360p</option>
+<option value="480p" ${localStorage.getItem("ytproPreferredQuality")==="480p"?"selected":""}>480p</option>
+<option value="720p" ${localStorage.getItem("ytproPreferredQuality")==="720p"?"selected":""}>720p</option>
+<option value="Auto" ${localStorage.getItem("ytproPreferredQuality")==="Auto"?"selected":""}>Auto</option>
+</select>
+</div>
+<br>
 <div>Hide Shorts <span data-action="sttCnf" data-value="shorts" style="${sttCnf(0,0,"shorts")}" ><b style="${sttCnf(0,1,"shorts")}" ></b></span></div> 
 <br>
 <div>Use single Gemini chat <span data-action="sttCnf" data-value="saveCInfo" style="${sttCnf(0,0,"saveCInfo")}" ><b style="${sttCnf(0,1,"saveCInfo")}"></b></span></div>
@@ -1025,6 +1038,14 @@ ytpSetI.querySelectorAll("[data-action]").forEach(button =>{
     }
   })
 });
+
+var qualitySelect = ytpSetI.querySelector("#ytproQualitySelect");
+if(qualitySelect){
+qualitySelect.addEventListener("change", ()=>{
+localStorage.setItem("ytproPreferredQuality", qualitySelect.value);
+window.Android?.showToast?.("Preferred quality set to " + qualitySelect.value);
+});
+}
 
 //settings tabs
 ytpSetI.querySelector(".ytproSettingsTabs").addEventListener("click",(e)=>{
@@ -1490,7 +1511,16 @@ iwindow.trustedTypes.createPolicy('default', {createHTML: (string) => string,cre
 iwindow.navigation.addEventListener("navigate", e => {
 if(e.destination.url.indexOf("youtube.com") > -1){
 if(e.destination.url.indexOf("/watch") > -1 || e.destination.url.indexOf("/shorts") > -1){
+// Use the top page's own SPA navigation instead of a hard reload
+// (window.location.href) — a full reload was causing a black-screen
+// flash when tapping a video inside the minimized background page.
+try{
+window.navigation.navigate(e.destination.url);
+}catch(err){
 window.location.href=e.destination.url;
+}
+// Close the miniplayer since we're now switching to this new video.
+try{ minimize(false); }catch(err){}
 }
 var script = doc.createElement("script");
 var scriptSource=`window.addEventListener('DOMContentLoaded', function() {
@@ -1535,6 +1565,52 @@ try{ ytproCreateMiniIframe(); }catch(e){}
 }, 3000);
 }
 
+// ---- Preferred playback quality: default 144p, remembers manual changes ----
+function ytproFindByText(root, text){
+var walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
+var node;
+while(node = walker.nextNode()){
+if(node.children.length === 0 && node.textContent && node.textContent.trim() === text){
+return node.closest('[role="button"], button, li, div') || node;
+}
+}
+return null;
+}
+
+function ytproApplyPreferredQuality(){
+try{
+var preferred = localStorage.getItem("ytproPreferredQuality") || "144p";
+if(preferred === "Auto") return; // Auto is YouTube's own default, nothing to do
+
+var settingsBtn = document.querySelector('.ytp-settings-button, [aria-label="Settings"], [aria-label="More options"]');
+if(!settingsBtn) return;
+settingsBtn.click();
+
+setTimeout(()=>{
+var qualityRow = ytproFindByText(document.body, "Quality");
+if(!qualityRow) return;
+qualityRow.click();
+
+setTimeout(()=>{
+var qualityOption = ytproFindByText(document.body, preferred);
+if(qualityOption){ qualityOption.click(); }
+}, 350);
+}, 350);
+}catch(e){ console.error('[YTPRO] auto-quality failed', e); }
+}
+
+if((window.location.pathname.indexOf("watch") > -1) || (window.location.pathname.indexOf("shorts") > -1)){
+setTimeout(ytproApplyPreferredQuality, 2500);
+}
+
+// If the user manually picks a quality from YouTube's own menu, remember it.
+document.body.addEventListener('click', (e)=>{
+var txt = e.target && e.target.textContent && e.target.textContent.trim();
+if(txt && /^(144p|240p|360p|480p|720p|1080p|Auto)$/.test(txt)){
+localStorage.setItem("ytproPreferredQuality", txt);
+}
+}, true);
+
 
 var ytproMiniPos = { corner: 'bottom-right' }; // remembers last chosen corner
 window.ytproIsMinimized = false;
@@ -1547,11 +1623,10 @@ if(corner.includes('left')) styles.left = margin + 'px'; else styles.right = mar
 return styles;
 }
 
-function ytproMakeDraggable(player){
+function ytproMakeDraggable(player, overlay){
 var dragging = false, startX=0, startY=0, startLeft=0, startTop=0, moved=0;
 
 function onStart(e){
-if(!window.ytproIsMinimized) return;
 dragging = true;
 moved = 0;
 var t = e.touches ? e.touches[0] : e;
@@ -1564,6 +1639,7 @@ player.style.transition = 'none'; // no lag while actively dragging
 function onMove(e){
 if(!dragging) return;
 e.preventDefault();
+e.stopPropagation();
 var t = e.touches ? e.touches[0] : e;
 var dx = t.clientX - startX;
 var dy = t.clientY - startY;
@@ -1578,12 +1654,12 @@ player.style.bottom = 'auto';
 function onEnd(e){
 if(!dragging) return;
 dragging = false;
+e.stopPropagation();
 player.style.transition = 'top .25s ease, left .25s ease, right .25s ease, bottom .25s ease, transform .3s ease';
 
 // Barely moved? Treat it as a tap — restore to full size (real YouTube's
 // mini player expands when tapped, not swiped).
 if(moved < 10){
-if(e.target && e.target.id === 'ytproMiniClose') return; // close button handles itself
 minimize(false);
 return;
 }
@@ -1599,10 +1675,9 @@ var styles = ytproMiniCornerStyle(corner);
 Object.assign(player.style, styles);
 }
 
-player.addEventListener('touchstart', onStart, {passive:true});
-player.addEventListener('touchmove', onMove, {passive:false});
-player.addEventListener('touchend', onEnd, {passive:true});
-player.__ytproDraggableBound = true;
+overlay.addEventListener('touchstart', onStart, {passive:true});
+overlay.addEventListener('touchmove', onMove, {passive:false});
+overlay.addEventListener('touchend', onEnd, {passive:true});
 }
 
 
@@ -1623,10 +1698,6 @@ iframe.dataset.loadedUrl = wantedUrl;
 
 // Smooth animated shrink/grow instead of an instant jump.
 player.style.transition = 'top .3s ease, left .3s ease, right .3s ease, bottom .3s ease, transform .3s ease, width .3s ease, height .3s ease';
-
-if(!player.__ytproDraggableBound){
-ytproMakeDraggable(player);
-}
 
 if(yes){
 
@@ -1653,15 +1724,42 @@ if(!document.getElementById('ytproMiniClose')){
 var closeBtn = document.createElement('div');
 closeBtn.id = 'ytproMiniClose';
 closeBtn.innerHTML = '&#10005;';
-closeBtn.style.cssText = 'position:absolute;top:4px;right:4px;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;font-size:14px;display:flex;align-items:center;justify-content:center;z-index:10000;';
+closeBtn.style.cssText = 'position:absolute;top:4px;right:4px;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;font-size:14px;display:flex;align-items:center;justify-content:center;z-index:10001;';
 closeBtn.addEventListener('click', (e)=>{
 e.stopPropagation();
 var v = document.getElementsByClassName('video-stream')[0];
 if(v) v.pause();
 minimize(false);
-closeBtn.remove();
 });
 player.appendChild(closeBtn);
+}
+
+if(!document.getElementById('ytproMiniPause')){
+var pauseBtn = document.createElement('div');
+pauseBtn.id = 'ytproMiniPause';
+var v0 = document.getElementsByClassName('video-stream')[0];
+pauseBtn.innerHTML = (v0 && v0.paused) ? '&#9658;' : '&#10074;&#10074;';
+pauseBtn.style.cssText = 'position:absolute;top:4px;left:4px;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;z-index:10001;';
+pauseBtn.addEventListener('click', (e)=>{
+e.stopPropagation();
+var v = document.getElementsByClassName('video-stream')[0];
+if(!v) return;
+if(v.paused){ v.play(); pauseBtn.innerHTML = '&#10074;&#10074;'; }
+else{ v.pause(); pauseBtn.innerHTML = '&#9658;'; }
+});
+player.appendChild(pauseBtn);
+}
+
+// Transparent overlay that captures ALL touches on the mini player itself,
+// so our drag/tap gestures never reach YouTube's own internal video/controls
+// touch handlers underneath (that conflict was causing the broken half
+// black-screen glitch when dragging the minimized player).
+if(!document.getElementById('ytproMiniOverlay')){
+var overlay = document.createElement('div');
+overlay.id = 'ytproMiniOverlay';
+overlay.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;z-index:10000;background:transparent;';
+player.appendChild(overlay);
+ytproMakeDraggable(player, overlay);
 }
 
 }else{
@@ -1669,6 +1767,10 @@ player.appendChild(closeBtn);
 window.ytproIsMinimized = false;
 var existingClose = document.getElementById('ytproMiniClose');
 if(existingClose) existingClose.remove();
+var existingPause = document.getElementById('ytproMiniPause');
+if(existingPause) existingPause.remove();
+var existingOverlay = document.getElementById('ytproMiniOverlay');
+if(existingOverlay) existingOverlay.remove();
 
 iframe.style.display="none";
 
