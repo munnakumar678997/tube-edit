@@ -146,6 +146,11 @@ public class WebAppInterface {
 	public void setBgPlay(boolean bgplay) {
 		activity.getSharedPreferences("YTPRO", Context.MODE_PRIVATE).edit().putBoolean("bgplay", bgplay).apply();
 	}
+
+	@JavascriptInterface
+	public void setAutoPip(boolean enabled) {
+		activity.getSharedPreferences("YTPRO", Context.MODE_PRIVATE).edit().putBoolean("autoPip", enabled).apply();
+	}
 	
 	@JavascriptInterface
 	public void bgStart(String iconn, String titlen, String subtitlen, long dura) {

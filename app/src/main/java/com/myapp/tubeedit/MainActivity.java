@@ -174,7 +174,10 @@ public class MainActivity extends Activity {
     @Override
     protected void onUserLeaveHint() {
         super.onUserLeaveHint();
-        if (Build.VERSION.SDK_INT >= 26 && web.getUrl() != null && web.getUrl().contains("watch")) {
+        boolean autoPipEnabled = getSharedPreferences("YTPRO", Context.MODE_PRIVATE).getBoolean("autoPip", true);
+        boolean onVideoPage = web.getUrl() != null && (web.getUrl().contains("watch") || web.getUrl().contains("shorts"));
+
+        if (Build.VERSION.SDK_INT >= 26 && autoPipEnabled && onVideoPage) {
             if (isPlaying) {
                 try {
                     isPip = true;

@@ -64,6 +64,7 @@ localStorage.setItem("prompt","Give me details about this YouTube video Id: {vid
 localStorage.setItem("devMode","false");
 localStorage.setItem("proxyOn","false");
 localStorage.setItem("loopVid","false");
+localStorage.setItem("autoPip","true");
 
 window.ytproRecordDownload = function(title, filename, type, thumbUrl, durationSec, videoId){
 try{
@@ -808,6 +809,8 @@ ytpSetI.innerHTML+=`<br><b style='font-size:18px' >Tube Edit Settings</b>
 <br>
 <div>Background Play <span data-action="sttCnf" data-value="bgplay" style="${sttCnf(0,0,"bgplay")}" ><b style="${sttCnf(0,1,"bgplay")}" ></b></span></div> 
 <br>
+<div>Auto PIP on Minimize <span data-action="sttCnf" data-value="autoPip" style="${sttCnf(0,0,"autoPip")}" ><b style="${sttCnf(0,1,"autoPip")}" ></b></span></div> 
+<br>
 <div>Hide Shorts <span data-action="sttCnf" data-value="shorts" style="${sttCnf(0,0,"shorts")}" ><b style="${sttCnf(0,1,"shorts")}" ></b></span></div> 
 <br>
 <div>Use single Gemini chat <span data-action="sttCnf" data-value="saveCInfo" style="${sttCnf(0,0,"saveCInfo")}" ><b style="${sttCnf(0,1,"saveCInfo")}"></b></span></div>
@@ -1216,6 +1219,8 @@ Android.setBgPlay(true);
 }else{
 Android.setBgPlay(false);
 }
+
+Android?.setAutoPip?.(localStorage.getItem("autoPip") !== "false");
 
 if(document.getElementsByClassName('video-stream')[0]){
 document.getElementsByClassName('video-stream')[0].loop = localStorage.getItem("loopVid") === "true";
