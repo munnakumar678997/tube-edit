@@ -56,7 +56,7 @@ if(localStorage.getItem("saveCInfo") == null  || localStorage.getItem("gesC") ==
 localStorage.setItem("autoSpn","true");
 localStorage.setItem("bgplay","true");
 localStorage.setItem("gesC","true");
-localStorage.setItem("gesM","false");
+localStorage.setItem("gesM","true");
 localStorage.setItem("fzoom","false");
 localStorage.setItem("saveCInfo","true");
 localStorage.setItem("geminiModel","3.0 Flash");
@@ -1846,6 +1846,11 @@ if(!document.getElementById("brtS")){
 document.getElementById("player-container-id").appendChild(elB);
 
 elB.addEventListener("touchmove",(e)=>{
+// Brightness/volume swipe should only apply during real fullscreen playback —
+// same as official YouTube. Otherwise it hijacks the swipe-down-to-minimize
+// gesture on the small/embedded player (and corrupts the shared touchstartY).
+if(!document.fullscreenElement) return;
+
 e.preventDefault();
 elB.style.opacity="1";
 
@@ -1883,6 +1888,8 @@ if(!document.getElementById("volS")){
 document.getElementById("player-container-id").appendChild(el);
 
 el.addEventListener("touchmove",(e)=>{
+if(!document.fullscreenElement) return;
+
 e.preventDefault();
 el.style.opacity="1";
 
