@@ -1417,10 +1417,9 @@ checkSponsors(e.destination.url);
 
 
 /*minimize function to mini the video*/
-function minimize(yes){
+function ytproCreateMiniIframe(){
 
-
-const createIframe=()=>{
+if(document.getElementById("miniIframe")) return document.getElementById("miniIframe");
 
 var iframe=document.createElement("iframe");
 iframe.setAttribute("id",`miniIframe`);
@@ -1433,6 +1432,7 @@ position:fixed;
 left:0;
 z-index:999;
 border:0;
+display:none;
 `);
 
 
@@ -1477,15 +1477,7 @@ document.body.appendChild(script2);
 });
 `;
 
-/*
-var script = document.createElement('script'); 
-script.src="//cdn.jsdelivr.net/npm/eruda"; 
-document.body.appendChild(script);
-script.onload = function () { eruda.init() } ;
-*/
 
-
-  
 var source = doc.createTextNode(scriptSource);
 script.appendChild(source);
 doc.body.appendChild(script);
@@ -1494,9 +1486,22 @@ return iframe;
 
 }
 
+// Preload the mini-player's background feed a couple seconds after a
+// video/shorts page loads, so by the time the user swipes down to minimize,
+// the feed behind the shrunk video is already loaded (no blank/skeleton flash).
+if((window.location.pathname.indexOf("watch") > -1) || (window.location.pathname.indexOf("shorts") > -1)){
+setTimeout(()=>{
+if(localStorage.getItem("gesM") == "true"){
+try{ ytproCreateMiniIframe(); }catch(e){}
+}
+}, 3000);
+}
 
 
-var iframe = document.getElementById("miniIframe") || createIframe();
+function minimize(yes){
+
+
+var iframe = document.getElementById("miniIframe") || ytproCreateMiniIframe();
 var player=document.getElementById("player-container-id");
 
 
