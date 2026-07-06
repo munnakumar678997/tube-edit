@@ -496,11 +496,30 @@ if(!vEl){ return; }
 vEl.muted=false;
 vEl.loop = localStorage.getItem("loopVid") === "true";
 
+// The audio is genuinely unmuted above, but YouTube's own "TAP TO UNMUTE"
+// banner doesn't know that (it only hides itself in response to its own
+// button being tapped) — so just hide the leftover banner ourselves.
+var unmuteBanner = ytproFindByText(document.body, "TAP TO UNMUTE");
+if(unmuteBanner){
+var bannerBox = unmuteBanner.closest('button, [role="button"], div') || unmuteBanner;
+bannerBox.style.display = 'none';
+}
+
 if(!vEl.muted){
 clearInterval(unV);
 }
 
 }, 5);
+
+setTimeout(()=>{
+var unmuteBanner2 = ytproFindByText(document.body, "TAP TO UNMUTE");
+if(unmuteBanner2){
+var bannerBox2 = unmuteBanner2.closest('button, [role="button"], div') || unmuteBanner2;
+bannerBox2.style.display = 'none';
+}
+var v2 = document.getElementsByClassName('video-stream')[0];
+if(v2) v2.muted = false;
+}, 800);
 
 // Preload the mini-player's background feed a couple seconds after a
 // video/shorts page loads, so by the time the user swipes down to minimize,
@@ -512,6 +531,33 @@ try{ ytproCreateMiniIframe(); }catch(e){}
 }, 3000);
 
 setTimeout(()=>{ try{ ytproApplyPreferredQuality(); }catch(e){} }, 2500);
+
+// ---- Ensure the next video auto-plays when this one ends ----
+// (loop is intentionally off, but YouTube's own "autoplay next" sometimes
+// doesn't fire — this is a safety net that forces it after a short wait.)
+var videoEl = document.getElementsByClassName('video-stream')[0];
+if(videoEl && !videoEl.__ytproEndedBound){
+videoEl.__ytproEndedBound = true;
+videoEl.addEventListener('ended', ()=>{
+if(localStorage.getItem("loopVid") === "true") return; // user wants this video to loop, leave it alone
+
+setTimeout(()=>{
+var v = document.getElementsByClassName('video-stream')[0];
+// Still sitting on the ended frame after ~2.5s? YouTube's own autoplay
+// didn't kick in — most likely its "Autoplay" toggle is off. Turn it on.
+if(v && v.ended){
+try{
+var autoplayToggle = ytproFindByText(document.body, "Autoplay");
+if(autoplayToggle){
+var toggleBox = autoplayToggle.closest('[role="button"], button, div');
+var toggleSwitch = toggleBox ? toggleBox.querySelector('[role="switch"][aria-checked="false"]') : null;
+if(toggleSwitch){ toggleSwitch.click(); }
+}
+}catch(e){}
+}
+}, 2500);
+});
+}
 
 }
 
