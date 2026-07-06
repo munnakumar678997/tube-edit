@@ -537,26 +537,26 @@ setTimeout(()=>{ try{ ytproApplyPreferredQuality(); }catch(e){} }, 2500);
 // doesn't fire, especially while minimized — so we fetch the real "up next"
 // video ourselves via the Innertube API and navigate straight to it if
 // needed. This is more reliable than trying to click YouTube's own UI.)
-(async function ytproPrefetchNextVideo(){
+// NOTE: this fetch only happens once the video actually ends — not while
+// it's playing — so it never competes with the video's own streaming for
+// bandwidth/CPU.
+async function ytproFetchNextVideoId(){
 try{
 var vid = new URLSearchParams(window.location.search).get("v") ||
 (window.location.pathname.indexOf("shorts") > -1 ? window.location.pathname.split("/shorts/")[1] : null);
-if(!vid) return;
+if(!vid) return null;
 
 const { Innertube } = await import('https://cdn.jsdelivr.net/npm/youtubei.js@17.0.1/bundle/browser.min.js');
 const cookies = window.Android?.getAllCookies?.('https://www.youtube.com') ?? '';
 const yt = await Innertube.create({ cookie: cookies, generate_session_locally: true });
 const info = await yt.getInfo(vid);
 
-var nextId =
-info?.watch_next_feed?.[0]?.id ||
+return info?.watch_next_feed?.[0]?.id ||
 info?.watch_next_feed?.[0]?.content?.video_id ||
 info?.watch_next_feed?.[0]?.content?.id ||
 null;
-
-if(nextId){ window.__ytproNextVideoId = nextId; }
-}catch(e){ console.error('[YTPRO] prefetch next video failed', e); }
-})();
+}catch(e){ console.error('[YTPRO] fetch next video failed', e); return null; }
+}
 
 var videoEl = document.getElementsByClassName('video-stream')[0];
 if(videoEl && !videoEl.__ytproEndedBound){
@@ -564,14 +564,17 @@ videoEl.__ytproEndedBound = true;
 videoEl.addEventListener('ended', ()=>{
 if(localStorage.getItem("loopVid") === "true") return; // user wants this video to loop, leave it alone
 
-setTimeout(()=>{
+setTimeout(async ()=>{
 var v = document.getElementsByClassName('video-stream')[0];
 // Still sitting on the ended frame after ~2.5s? YouTube's own autoplay
-// didn't kick in — jump straight to the "up next" video we prefetched.
-if(v && v.ended && window.__ytproNextVideoId){
+// didn't kick in — fetch and jump straight to the "up next" video.
+if(v && v.ended){
 try{
-var nextUrl = "https://m.youtube.com/watch?v=" + window.__ytproNextVideoId;
+var nextId = await ytproFetchNextVideoId();
+if(nextId){
+var nextUrl = "https://m.youtube.com/watch?v=" + nextId;
 window.navigation.navigate(nextUrl);
+}
 }catch(e){}
 }
 }, 2500);
@@ -1668,35 +1671,13 @@ return null;
 }
 
 function ytproApplyPreferredQuality(){
-try{
-var preferred = localStorage.getItem("ytproPreferredQuality") || "144p";
-if(preferred === "Auto") return; // Auto is YouTube's own default, nothing to do
-
-var playerRoot = document.getElementById('player-container-id');
-if(!playerRoot) return;
-
-// The settings gear is often only rendered/visible after the player
-// controls are revealed (a tap on the video). Reveal them first.
-var vEl = playerRoot.getElementsByClassName('video-stream')[0];
-if(vEl){ vEl.click(); }
-
-setTimeout(()=>{
-var settingsBtn = ytproFindSettingsGear(playerRoot);
-if(!settingsBtn) return;
-settingsBtn.click();
-
-setTimeout(()=>{
-var qualityRow = ytproFindByText(document.body, "Quality");
-if(!qualityRow) return;
-qualityRow.click();
-
-setTimeout(()=>{
-var qualityOption = ytproFindByText(document.body, preferred);
-if(qualityOption){ qualityOption.click(); }
-}, 350);
-}, 350);
-}, 300);
-}catch(e){ console.error('[YTPRO] auto-quality failed', e); }
+// DISABLED: simulating a tap on the video to reveal controls was pausing/
+// breaking playback for everyone (a tap on YouTube's video area toggles
+// play/pause). This automation isn't safe without deeper access to
+// YouTube's own player internals, so it's turned off for now. The user's
+// preferred-quality choice is still saved and available if a safer way
+// to apply it is found later.
+return;
 }
 
 // (quality automation now happens inside ytproOnVideoPageLoad, re-run on every video)
