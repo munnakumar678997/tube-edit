@@ -532,7 +532,10 @@ try{ ytproCreateMiniIframe(); }catch(e){}
 }
 }, 3000);
 
-setTimeout(()=>{ try{ ytproApplyPreferredQuality(); }catch(e){} }, 2500);
+// FIX: Call quality IMMEDIATELY (no 2500ms delay) so the player never
+// starts buffering at Auto quality. Polling catches movie_player within
+// 200-400ms — before the first video chunk is requested at the wrong quality.
+try{ ytproApplyPreferredQuality(); }catch(e){}
 
 // ---- Ensure the next video auto-plays when this one ends ----
 // (loop is intentionally off, but YouTube's own "autoplay next" sometimes
@@ -544,6 +547,38 @@ setTimeout(()=>{ try{ ytproApplyPreferredQuality(); }catch(e){} }, 2500);
 // bandwidth/CPU.
 // FIX #7: Import had no timeout — if cdn.jsdelivr.net was slow or down,
 // ytproFetchNextVideoId hung forever. Fixed with 8s timeout via Promise.race().
+// FAST PATH: extract next-video ID from YouTube's existing DOM — zero network calls,
+// typically completes in <5ms. YouTube's own "Up Next" / autoplay bar is already
+// in the page; we just read the link it already computed.
+function ytproGetNextVideoIdFromDOM(){
+var selectors = [
+  // Mobile autoplay renderer — the "Up Next" card shown above the recommendations
+  'ytm-compact-autoplay-renderer a[href*="watch?v="]',
+  'ytm-compact-autoplay-renderer a[href*="/shorts/"]',
+  // Player overlay next-up strip
+  '#player-overlay a[href*="watch?v="]',
+  // Watch-next section — first recommendation is the autoplay target
+  'ytm-item-section-renderer ytm-compact-video-renderer:first-of-type a[href*="watch?v="]',
+  // Generic first watch-link fallback
+  '.related-items a[href*="watch?v="]',
+];
+for(var i=0;i<selectors.length;i++){
+  try{
+    var el=document.querySelector(selectors[i]);
+    if(!el) continue;
+    var href=el.getAttribute('href')||el.href||'';
+    var m=href.match(/[?&]v=([A-Za-z0-9_-]{11})/);
+    if(m && m[1]) return m[1];
+    // Shorts path  /shorts/ID
+    m=href.match(/\/shorts\/([A-Za-z0-9_-]{11})/);
+    if(m && m[1]) return m[1];
+  }catch(e){}
+}
+return null;
+}
+
+// SLOW FALLBACK: Innertube API — only used when the DOM has no next-video link
+// (e.g. screen-off / background play where YouTube never rendered recommendations).
 async function ytproFetchNextVideoId(){
 try{
 var vid = new URLSearchParams(window.location.search).get("v") ||
@@ -563,7 +598,7 @@ return info?.watch_next_feed?.[0]?.id ||
 info?.watch_next_feed?.[0]?.content?.video_id ||
 info?.watch_next_feed?.[0]?.content?.id ||
 null;
-}catch(e){ console.error('[YTPRO] fetch next video failed', e); return null; }
+}catch(e){ console.warn('[YTPRO] innertube fetch next video failed', e); return null; }
 }
 
 // FIX #8: YouTube SPA reuses the same <video> element across video navigations.
@@ -585,26 +620,32 @@ if(videoEl.__ytproEndedHandler){
 videoEl.__ytproEndedHandler = async function _ytproEndedHandler(){
 if(localStorage.getItem("loopVid") === "true") return; // user wants this video to loop
 
+// Wait 1 second (was 2500ms) — enough for YouTube's native autoplay to fire.
+// If it doesn't (e.g. screen off, background mode), we take over.
 setTimeout(async ()=>{
 var v = document.getElementsByClassName('video-stream')[0];
-// Still sitting on the ended frame after ~2.5s? YouTube's own autoplay
-// didn't kick in — fetch and jump straight to the "up next" video.
-if(v && v.ended){
+if(!(v && v.ended)) return; // YouTube's own autoplay already handled it
+
 try{
-var nextId = await ytproFetchNextVideoId();
-if(nextId){
-var nextUrl = "https://m.youtube.com/watch?v=" + nextId;
-// FIX #6: window.navigation.navigate() only exists on newer WebViews.
-// Fall back to window.location.href for older devices.
-if(window.navigation && typeof window.navigation.navigate === 'function'){
-  window.navigation.navigate(nextUrl);
-} else {
-  window.location.href = nextUrl;
+// FAST PATH: read next-video ID straight from the DOM — no network call needed.
+var nextId = ytproGetNextVideoIdFromDOM();
+if(!nextId){
+  // SLOW FALLBACK: DOM had no recommendations rendered (screen-off / background).
+  // Use Innertube API — this is the case where it's actually necessary.
+  nextId = await ytproFetchNextVideoId();
 }
+if(nextId){
+  var nextUrl = "https://m.youtube.com/watch?v=" + nextId;
+  // FIX #6: window.navigation.navigate() only exists on newer WebViews.
+  // Fall back to window.location.href for older devices.
+  if(window.navigation && typeof window.navigation.navigate === 'function'){
+    window.navigation.navigate(nextUrl);
+  } else {
+    window.location.href = nextUrl;
+  }
 }
 }catch(e){}
-}
-}, 2500);
+}, 1000);
 };
 videoEl.addEventListener('ended', videoEl.__ytproEndedHandler);
 videoEl.__ytproEndedBoundVid = _curVidId;
@@ -1740,12 +1781,25 @@ if(pref === "Auto") return; // Auto means let YouTube decide — nothing to do
 var qMap = {"144p":"tiny","240p":"small","360p":"medium","480p":"large","720p":"hd720","1080p":"hd1080"};
 var ytQ = qMap[pref];
 if(!ytQ) return;
+// Also pre-set via YouTube's own localStorage key so the player reads 144p
+// at init time — before the first video chunk is even requested.
+try{
+  var stored = JSON.parse(localStorage.getItem('yt-player-quality') || '{}');
+  stored.data = stored.data || {};
+  stored.data.quality = ytQ;
+  stored.data.quality_cap = 0;
+  stored.expiration = Date.now() + 86400000;
+  stored.creation = Date.now();
+  localStorage.setItem('yt-player-quality', JSON.stringify(stored));
+}catch(e){}
 // Cancel any in-progress quality poll from the previous video so they don't overlap.
 if(ytproQualityTimer){ clearInterval(ytproQualityTimer); ytproQualityTimer = null; }
 var attempt = 0;
+// Poll every 200ms (was 500ms) — catches movie_player ~3x faster.
+// Max 25 attempts = 5 seconds total before giving up.
 ytproQualityTimer = setInterval(function(){
   attempt++;
-  if(attempt > 20){ clearInterval(ytproQualityTimer); ytproQualityTimer = null; return; } // give up after 10s
+  if(attempt > 25){ clearInterval(ytproQualityTimer); ytproQualityTimer = null; return; }
   try{
     var player = document.getElementById('movie_player');
     if(player && typeof player.setPlaybackQuality === 'function'){
@@ -1754,7 +1808,7 @@ ytproQualityTimer = setInterval(function(){
       clearInterval(ytproQualityTimer); ytproQualityTimer = null;
     }
   }catch(err){}
-}, 500);
+}, 200);
 }
 
 // (quality automation now happens inside ytproOnVideoPageLoad, re-run on every video)
