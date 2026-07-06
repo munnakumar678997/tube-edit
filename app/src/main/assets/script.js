@@ -1612,6 +1612,9 @@ window.addEventListener('popstate', function(ev){
     fDislikes(href);
     checkSponsors(href);
     setTimeout(()=>{ try{ ytproOnVideoPageLoad(); }catch(e){} }, 400);
+  } else {
+    // Track last feed URL in popstate path too (was only tracked in Navigation API path).
+    try{ sessionStorage.setItem("ytproLastFeedUrl", href); }catch(err){}
   }
 });
 }
@@ -1651,6 +1654,8 @@ iwindow.trustedTypes.createPolicy('default', {createHTML: (string) => string,cre
 }
 }
 
+// Guard: older WebViews may not support Navigation API on the iframe window
+if(iwindow.navigation && typeof iwindow.navigation.addEventListener === 'function')
 iwindow.navigation.addEventListener("navigate", e => {
 if(e.destination.url.indexOf("youtube.com") > -1){
 if(e.destination.url.indexOf("/watch") > -1 || e.destination.url.indexOf("/shorts") > -1){
@@ -1726,6 +1731,7 @@ return el;
 return null;
 }
 
+var ytproQualityTimer = null; // global so rapid SPA navigations cancel the prior poll
 function ytproApplyPreferredQuality(){
 // Use YouTube's internal movie_player API to set quality without simulating
 // any tap/click (which was breaking playback). 'tiny'=144p, 'small'=240p, etc.
@@ -1734,16 +1740,18 @@ if(pref === "Auto") return; // Auto means let YouTube decide — nothing to do
 var qMap = {"144p":"tiny","240p":"small","360p":"medium","480p":"large","720p":"hd720","1080p":"hd1080"};
 var ytQ = qMap[pref];
 if(!ytQ) return;
+// Cancel any in-progress quality poll from the previous video so they don't overlap.
+if(ytproQualityTimer){ clearInterval(ytproQualityTimer); ytproQualityTimer = null; }
 var attempt = 0;
-var timer = setInterval(function(){
+ytproQualityTimer = setInterval(function(){
   attempt++;
-  if(attempt > 20){ clearInterval(timer); return; } // give up after 10s
+  if(attempt > 20){ clearInterval(ytproQualityTimer); ytproQualityTimer = null; return; } // give up after 10s
   try{
     var player = document.getElementById('movie_player');
     if(player && typeof player.setPlaybackQuality === 'function'){
       player.setPlaybackQuality(ytQ);
       if(typeof player.setPlaybackQualityRange === 'function') player.setPlaybackQualityRange(ytQ, ytQ);
-      clearInterval(timer);
+      clearInterval(ytproQualityTimer); ytproQualityTimer = null;
     }
   }catch(err){}
 }, 500);
