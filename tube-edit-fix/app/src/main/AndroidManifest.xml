@@ -1,0 +1,124 @@
+<manifest
+	xmlns:android="http://schemas.android.com/apk/res/android"
+	package="com.myapp.tubeedit">
+	<uses-permission android:name="android.permission.INTERNET"/>
+	<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+	<uses-permission android:name="android.permission.RECORD_AUDIO" />
+	<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+	
+<!--
+  Storage permissions only apply on API 21-28 (Android 5.0-9.0).
+  API 29 (Android 10) uses MediaStore for downloads without needing these runtime
+  permissions (BinaryStreamManager API 29+ path). API 30+ (Android 11+) also
+  needs neither — so maxSdkVersion="28" is correct for the manifest.
+  The Java code must NOT check for these permissions on API 29; it must treat
+  API 29 the same as API 30+ (always granted for MediaStore-based downloads).
+-->
+<uses-permission
+    android:name="android.permission.READ_EXTERNAL_STORAGE"
+    android:maxSdkVersion="28" />
+
+<uses-permission
+    android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+    android:maxSdkVersion="28" />
+
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+	<application
+		android:name=".CrashApp"
+		android:allowBackup="true"
+		android:label="@string/app_name"
+		android:icon="@mipmap/app_icon"
+		android:roundIcon="@mipmap/app_icon"
+		android:largeHeap="true"
+		android:usesCleartextTraffic="true"
+		android:theme="@style/AppTheme">
+		<activity
+			android:name=".MainActivity"
+			android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout"
+			android:hardwareAccelerated="true"
+			android:supportsPictureInPicture="true"
+		        android:theme="@style/SplashTheme"
+                        android:exported="true"
+			android:screenOrientation="unspecified">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN"/>
+				<category android:name="android.intent.category.LAUNCHER"/>
+			</intent-filter>
+			<intent-filter>
+				<action android:name="android.intent.action.VIEW" />
+				<category android:name="android.intent.category.DEFAULT" />
+				<category android:name="android.intent.category.BROWSABLE" />
+				<data android:scheme="http" />
+				<data android:scheme="https" />
+				<data android:host="youtube.com" />
+				<data android:host="*.youtube.com" />
+				<data android:host="youtu.be" />
+			</intent-filter>
+			<intent-filter>
+				<action android:name="android.intent.action.SEND" />
+				<category android:name="android.intent.category.DEFAULT" />
+				<data android:mimeType="text/plain" />
+			</intent-filter>
+		</activity>
+		<activity
+			android:name=".DownloadFromIntentFilter"
+			android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout"
+			android:hardwareAccelerated="true"
+			android:supportsPictureInPicture="true"
+			android:theme="@style/AppTheme"
+			android:exported="true"
+			android:screenOrientation="unspecified">
+			<intent-filter android:label="@string/dl">
+				<action android:name="android.intent.action.VIEW" />
+				<category android:name="android.intent.category.DEFAULT" />
+				<category android:name="android.intent.category.BROWSABLE" />
+				<data android:scheme="http" />
+				<data android:scheme="https" />
+				<data android:host="youtube.com" />
+				<data android:host="*.youtube.com" />
+				<data android:host="youtu.be" />
+			</intent-filter>
+			<intent-filter android:label="@string/dl">
+				<action android:name="android.intent.action.SEND" />
+				<category android:name="android.intent.category.DEFAULT" />
+				<data android:mimeType="text/plain" />
+			</intent-filter>
+		</activity>
+		<!--
+		  ForegroundService: exported="false" — only our own app (via startService /
+		  startForegroundService) should be able to start it. Any external app
+		  that could start it could send crafted icon Base64 payloads and trigger
+		  crashes or fake media notifications.
+		-->
+		<service
+			android:name=".ForegroundService"
+			android:enabled="true"
+			android:exported="false"
+			android:foregroundServiceType="mediaPlayback"
+			/>
+
+		<!--
+		  FIX #29: NotificationActionReceiver — added android:exported="false".
+		  Previously it was declared without an exported attribute, which on Android 12+
+		  (API 31+) either causes a build error or defaults to exported=true, allowing
+		  any other app on the device to send spoofed PLAY/PAUSE/NEXT/PREV broadcasts.
+		  A PendingIntent from our own ForegroundService still works even with exported=false
+		  because the PendingIntent grants the system permission to trigger it on our behalf.
+		-->
+		<receiver android:name=".receivers.NotificationActionReceiver"
+		          android:exported="false"/>
+
+		<activity android:name=".CrashActivity" android:exported="false" />
+
+		<provider
+			android:name="androidx.core.content.FileProvider"
+			android:authorities="com.myapp.tubeedit.fileprovider"
+			android:exported="false"
+			android:grantUriPermissions="true">
+			<meta-data
+				android:name="android.support.FILE_PROVIDER_PATHS"
+				android:resource="@xml/file_paths" />
+		</provider>
+	</application>
+</manifest>

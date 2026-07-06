@@ -1,0 +1,73 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build
+        run: |
+          set -o pipefail
+          ./gradlew assembleRelease --stacktrace 2>&1 | tee build_output.log
+
+      - name: Save build log on failure
+        if: failure()
+        run: |
+          git config user.email "buildbot@tube-edit.local"
+          git config user.name "build-bot"
+          mkdir -p .buildlogs
+          tail -n 400 build_output.log > .buildlogs/last_error.log
+          git add .buildlogs/last_error.log
+          git commit -m "Save build error log [skip ci]" || echo "nothing to commit"
+          git push || echo "push failed"
+
+      - name: Sign APK
+        run: |
+          java -jar "signer/apksigner.jar" sign \
+            --key "signer/apkeasytool.pk8" \
+            --cert "signer/apkeasytool.pem" \
+            --v4-signing-enabled false \
+            --out "app/build/outputs/apk/release/tube-edit-signed.apk" \
+            "app/build/outputs/apk/release/app-release-unsigned.apk"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tube-edit-apk
+          path: app/build/outputs/apk/release/tube-edit-signed.apk
+
+      - name: Extract version name
+        id: ver
+        run: |
+          VNAME=$(grep -oP 'versionName\s+"\K[^"]+' app/build.gradle)
+          echo "version=$VNAME" >> "$GITHUB_OUTPUT"
+
+      - name: Publish/Update "latest" release with APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "v${{ steps.ver.outputs.version }}"
+          body: "Automatically built APK — version ${{ steps.ver.outputs.version }}. Always the latest code from main."
+          files: app/build/outputs/apk/release/tube-edit-signed.apk
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
