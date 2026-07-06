@@ -48,8 +48,6 @@ public class ForegroundService extends Service {
                 super.onPlay();
                 getApplicationContext().sendBroadcast(new Intent("TRACKS_TRACKS")
                         .putExtra("actionname", "PLAY_ACTION"));
-                        Log.e("pause","play session called");
-
             }
 
             @Override
@@ -57,14 +55,11 @@ public class ForegroundService extends Service {
                 super.onPause();
                 getApplicationContext().sendBroadcast(new Intent("TRACKS_TRACKS")
                         .putExtra("actionname", "PAUSE_ACTION"));
-                        
-                        Log.e("pause","pause session called");
             }
 
             @Override
             public void onSkipToNext() {
                 super.onSkipToNext();
-// Handle skip to next
                 getApplicationContext().sendBroadcast(new Intent("TRACKS_TRACKS")
                         .putExtra("actionname", "NEXT_ACTION"));
             }
@@ -72,19 +67,15 @@ public class ForegroundService extends Service {
             @Override
             public void onSkipToPrevious() {
                 super.onSkipToPrevious();
-// Handle skip to previous
-
                 getApplicationContext().sendBroadcast(new Intent("TRACKS_TRACKS")
                         .putExtra("actionname", "PREV_ACTION"));
-
             }
+
             @Override
             public void onSeekTo(long pos) {
                 super.onSeekTo(pos);
                 getApplicationContext().sendBroadcast(new Intent("TRACKS_TRACKS")
-                        .putExtra("actionname", "SEEKTO").putExtra("pos", pos+""));
-
-
+                        .putExtra("actionname", "SEEKTO").putExtra("pos", pos + ""));
             }
         });
 
@@ -108,46 +99,51 @@ public class ForegroundService extends Service {
 
     public void updateNotification(String icon, String title, String subtitle, String action, long duration, long currentPosition) {
 
-        Context cont=getApplicationContext();
+        Context cont = getApplicationContext();
 
         byte[] decodedBytes = Base64.decode(icon, Base64.DEFAULT);
         Bitmap largeIcon = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.length);
 
-
         int playbackState;
-        if("pause".equals(action)){
-            playbackState= PlaybackState.STATE_PAUSED;
-        }
-        else if("play".equals(action)){
-            playbackState= PlaybackState.STATE_PLAYING;
-        }else{
-            playbackState= PlaybackState.STATE_BUFFERING;
+        if ("pause".equals(action)) {
+            playbackState = PlaybackState.STATE_PAUSED;
+        } else if ("play".equals(action)) {
+            playbackState = PlaybackState.STATE_PLAYING;
+        } else {
+            playbackState = PlaybackState.STATE_BUFFERING;
         }
 
-        updateMediaSessionMetadata(title, subtitle, largeIcon, duration); 
-        updatePlaybackState(currentPosition, playbackState); 
+        updateMediaSessionMetadata(title, subtitle, largeIcon, duration);
+        updatePlaybackState(currentPosition, playbackState);
 
         Intent openAppIntent = new Intent(cont, MainActivity.class);
         openAppIntent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        PendingIntent openAppPendingIntent = PendingIntent.getActivity(cont, 0, openAppIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
+        PendingIntent openAppPendingIntent = PendingIntent.getActivity(cont, 0, openAppIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
 
         Intent playIntent = new Intent(cont, NotificationActionReceiver.class);
         playIntent.setAction("PLAY_ACTION");
-        PendingIntent playPendingIntent = PendingIntent.getBroadcast(cont, 0, playIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
+        PendingIntent playPendingIntent = PendingIntent.getBroadcast(cont, 0, playIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
 
         Intent pauseIntent = new Intent(cont, NotificationActionReceiver.class);
         pauseIntent.setAction("PAUSE_ACTION");
-        PendingIntent pausePendingIntent = PendingIntent.getBroadcast(cont, 0, pauseIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
+        PendingIntent pausePendingIntent = PendingIntent.getBroadcast(cont, 0, pauseIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
 
         Intent nextIntent = new Intent(cont, NotificationActionReceiver.class);
         nextIntent.setAction("NEXT_ACTION");
-        PendingIntent nextPendingIntent = PendingIntent.getBroadcast(cont, 0, nextIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
+        PendingIntent nextPendingIntent = PendingIntent.getBroadcast(cont, 0, nextIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
 
         Intent prevIntent = new Intent(cont, NotificationActionReceiver.class);
         prevIntent.setAction("PREV_ACTION");
-        PendingIntent prevPendingIntent = PendingIntent.getBroadcast(cont, 0, prevIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
+        PendingIntent prevPendingIntent = PendingIntent.getBroadcast(cont, 0, prevIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
 
-        Notification.Builder builder = (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) ? new Notification.Builder(this, CHANNEL_ID) : new Notification.Builder(this);
+        Notification.Builder builder = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                ? new Notification.Builder(this, CHANNEL_ID)
+                : new Notification.Builder(this);
 
         builder.setSmallIcon((Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ? R.drawable.notification : R.mipmap.app_icon)
                 .setContentTitle(title)
@@ -160,21 +156,16 @@ public class ForegroundService extends Service {
         if ("play".equals(action)) {
             builder.addAction(R.drawable.ic_pause_white, "Pause", pausePendingIntent)
                     .addAction(R.drawable.ic_skip_next_white, "Next", nextPendingIntent);
-        } else if ("pause".equals(action))  {
+        } else if ("pause".equals(action)) {
             builder.addAction(R.drawable.ic_play_arrow_white, "Play", playPendingIntent)
                     .addAction(R.drawable.ic_skip_next_white, "Next", nextPendingIntent);
-        }else{
-
+        } else {
             builder.addAction(R.drawable.ic_pause_white, "Pause", pausePendingIntent)
                     .addAction(R.drawable.ic_skip_next_white, "Next", nextPendingIntent);
-
         }
-
-
 
         notificationManager.notify(1, builder.build());
     }
-
 
 
     private void registerUpdateReceiver() {
@@ -196,12 +187,11 @@ public class ForegroundService extends Service {
 
         IntentFilter filter = new IntentFilter(ACTION_UPDATE_NOTIFICATION);
 
-          if (Build.VERSION.SDK_INT >= 34 && getApplicationInfo().targetSdkVersion >= 34) {
-           registerReceiver(updateReceiver, filter,RECEIVER_EXPORTED);
-          }
-          else{
-           registerReceiver(updateReceiver, filter);
-          }
+        if (Build.VERSION.SDK_INT >= 34 && getApplicationInfo().targetSdkVersion >= 34) {
+            registerReceiver(updateReceiver, filter, RECEIVER_EXPORTED);
+        } else {
+            registerReceiver(updateReceiver, filter);
+        }
     }
 
     @Override
@@ -217,18 +207,16 @@ public class ForegroundService extends Service {
         long duration = intent.getLongExtra("duration", 0);
         long currentPosition = intent.getLongExtra("currentPosition", 0);
         String action = intent.getStringExtra("action");
-        
+
         int playbackState;
-        if("pause".equals(action)){
-            playbackState= PlaybackState.STATE_PAUSED;
+        if ("pause".equals(action)) {
+            playbackState = PlaybackState.STATE_PAUSED;
+        } else if ("play".equals(action)) {
+            playbackState = PlaybackState.STATE_PLAYING;
+        } else {
+            playbackState = PlaybackState.STATE_BUFFERING;
         }
-        else if("play".equals(action)){
-            playbackState= PlaybackState.STATE_PLAYING;
-        }else{
-            playbackState= PlaybackState.STATE_BUFFERING;
-        }
-        
-        
+
         String title = intent.getStringExtra("title");
         String subtitle = intent.getStringExtra("subtitle");
         String icon = intent.getStringExtra("icon");
@@ -238,92 +226,100 @@ public class ForegroundService extends Service {
 
         Intent openAppIntent = new Intent(this, MainActivity.class);
         openAppIntent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        PendingIntent openAppPendingIntent = PendingIntent.getActivity(this, 0, openAppIntent, PendingIntent.FLAG_MUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        PendingIntent openAppPendingIntent = PendingIntent.getActivity(this, 0, openAppIntent,
+                PendingIntent.FLAG_MUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
 
         Intent playIntent = new Intent(this, NotificationActionReceiver.class);
         playIntent.setAction("PLAY_ACTION");
-        PendingIntent playPendingIntent = PendingIntent.getBroadcast(this, 0, playIntent, PendingIntent.FLAG_MUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        PendingIntent playPendingIntent = PendingIntent.getBroadcast(this, 0, playIntent,
+                PendingIntent.FLAG_MUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
 
         Intent pauseIntent = new Intent(this, NotificationActionReceiver.class);
         pauseIntent.setAction("PAUSE_ACTION");
-        PendingIntent pausePendingIntent = PendingIntent.getBroadcast(this, 0, pauseIntent, PendingIntent.FLAG_MUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        PendingIntent pausePendingIntent = PendingIntent.getBroadcast(this, 0, pauseIntent,
+                PendingIntent.FLAG_MUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
 
         Intent nextIntent = new Intent(this, NotificationActionReceiver.class);
         nextIntent.setAction("NEXT_ACTION");
-        PendingIntent nextPendingIntent = PendingIntent.getBroadcast(this, 0, nextIntent, PendingIntent.FLAG_MUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        PendingIntent nextPendingIntent = PendingIntent.getBroadcast(this, 0, nextIntent,
+                PendingIntent.FLAG_MUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
 
         Intent prevIntent = new Intent(this, NotificationActionReceiver.class);
         prevIntent.setAction("PREV_ACTION");
-        PendingIntent prevPendingIntent = PendingIntent.getBroadcast(this, 0, prevIntent, PendingIntent.FLAG_MUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        PendingIntent prevPendingIntent = PendingIntent.getBroadcast(this, 0, prevIntent,
+                PendingIntent.FLAG_MUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
 
-        Notification.Builder builder = (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) ? new Notification.Builder(this, CHANNEL_ID) : new Notification.Builder(this);
+        Notification.Builder builder = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                ? new Notification.Builder(this, CHANNEL_ID)
+                : new Notification.Builder(this);
 
-                builder.setSmallIcon((Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ? R.drawable.notification : R.mipmap.app_icon)
+        builder.setSmallIcon((Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ? R.drawable.notification : R.mipmap.app_icon)
                 .setContentTitle(title)
                 .setContentText(subtitle)
                 .setLargeIcon(largeIcon)
                 .setStyle(new Notification.MediaStyle().setMediaSession(mediaSession.getSessionToken()))
                 .setContentIntent(openAppPendingIntent);
 
-
         builder.addAction(R.drawable.ic_skip_previous_white, "Previous", prevPendingIntent);
-        
-                    builder.addAction(R.drawable.ic_pause_white, "Pause", pausePendingIntent);
-                    
-                builder.addAction(R.drawable.ic_skip_next_white, "Next", nextPendingIntent);
+        builder.addAction(R.drawable.ic_pause_white, "Pause", pausePendingIntent);
+        builder.addAction(R.drawable.ic_skip_next_white, "Next", nextPendingIntent);
 
         Notification notification = builder.build();
 
-        // Update MediaSession metadata and playback state
         updateMediaSessionMetadata(title, subtitle, largeIcon, duration);
         updatePlaybackState(currentPosition, playbackState);
 
         startForeground(1, notification);
     }
-    
-    
-    
-    
-    
-    
+
+
     private void updateMediaSessionMetadata(String title, String artist, Bitmap albumArt, long duration) {
+        if (mediaSession == null) return;
         MediaMetadata metadata = new MediaMetadata.Builder()
-                .putString(MediaMetadata.METADATA_KEY_TITLE, title)
-                .putString(MediaMetadata.METADATA_KEY_ARTIST, artist)
-                .putString(MediaMetadata.METADATA_KEY_ALBUM, "YT PRO")
+                .putString(MediaMetadata.METADATA_KEY_TITLE, title != null ? title : "")
+                .putString(MediaMetadata.METADATA_KEY_ARTIST, artist != null ? artist : "")
+                .putString(MediaMetadata.METADATA_KEY_ALBUM, "Tube Edit")  // minor: was "YT PRO"
                 .putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, albumArt)
                 .putLong(MediaMetadata.METADATA_KEY_DURATION, duration)
                 .build();
-
         mediaSession.setMetadata(metadata);
     }
 
 
-
-
-
-
-
     private void updatePlaybackState(long currentPosition, int state) {
+        if (mediaSession == null) return;
         PlaybackState playbackState = new PlaybackState.Builder()
                 .setActions(PlaybackState.ACTION_PLAY
                         | PlaybackState.ACTION_SKIP_TO_NEXT
                         | PlaybackState.ACTION_PAUSE
-                        | PlaybackState.ACTION_SKIP_TO_PREVIOUS | PlaybackState.ACTION_SEEK_TO)
-                .setState(state, currentPosition, 1.0f) // 1.0f for playback speed
+                        | PlaybackState.ACTION_SKIP_TO_PREVIOUS
+                        | PlaybackState.ACTION_SEEK_TO)
+                .setState(state, currentPosition, 1.0f)
                 .build();
-                
-                
-                // rn it doesn't have a function to increase the playback speed if someone increases it from the youtube player , cuz people don't usually use that , and i am too lazy to implement it here
-
         mediaSession.setPlaybackState(playbackState);
     }
 
 
+    // FIX #28: MediaSession was never released/deactivated on service destroy.
+    // This caused a "leaked" MediaSession that could interfere with subsequent
+    // playback sessions and consume system resources.
     @Override
     public void onDestroy() {
         super.onDestroy();
-        unregisterReceiver(updateReceiver);
+        if (updateReceiver != null) {
+            try {
+                unregisterReceiver(updateReceiver);
+            } catch (IllegalArgumentException e) {
+                Log.w("YTPRO_FS", "Receiver already unregistered: " + e.getMessage());
+            }
+            updateReceiver = null;
+        }
+        // FIX #28: deactivate and release the MediaSession properly
+        if (mediaSession != null) {
+            mediaSession.setActive(false);
+            mediaSession.release();
+            mediaSession = null;
+        }
     }
 
     @Override

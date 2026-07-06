@@ -84,7 +84,17 @@
 			android:foregroundServiceType="mediaPlayback"
 			/>
 
-		<receiver android:name=".receivers.NotificationActionReceiver"/>
+		<!--
+		  FIX #29: NotificationActionReceiver — added android:exported="false".
+		  Previously it was declared without an exported attribute, which on Android 12+
+		  (API 31+) either causes a build error or defaults to exported=true, allowing
+		  any other app on the device to send spoofed PLAY/PAUSE/NEXT/PREV broadcasts.
+		  A PendingIntent from our own ForegroundService still works even with exported=false
+		  because the PendingIntent grants the system permission to trigger it on our behalf.
+		-->
+		<receiver android:name=".receivers.NotificationActionReceiver"
+		          android:exported="false"/>
+
 		<activity android:name=".CrashActivity" android:exported="false" />
 
 		<provider
@@ -98,5 +108,3 @@
 		</provider>
 	</application>
 </manifest>
-
-

@@ -1352,8 +1352,11 @@ window.ytproDownloadPlaylist = async function () {
 		} catch (e) {
 			console.error('[YTPRO] Playlist item failed:', videoIds[i], e);
 		}
-		// brief pause between items so we don't hammer YouTube's endpoints
-		await new Promise(r => setTimeout(r, 1500));
+		// FIX #25: Fixed 1500ms delay between playlist items was a predictable
+		// pattern that YouTube's rate-limiter recognises easily. Adding random
+		// jitter (±500ms) makes the request timing look more organic.
+		var _jitter = 1500 + Math.floor(Math.random() * 500);
+		await new Promise(r => setTimeout(r, _jitter));
 	}
 
 	window.Android?.showToast?.('Playlist download finished.');

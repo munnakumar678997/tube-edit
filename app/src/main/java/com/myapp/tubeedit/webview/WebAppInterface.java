@@ -33,11 +33,17 @@ import com.myapp.tubeedit.utils.SecurePrefs;
 
 import org.json.JSONObject;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class WebAppInterface {
 	private final MainActivity activity;
 	private final YTProWebView web;
 	private final AudioManager audioManager;
+
+	// FIX #5: Single-thread executor for Gemini calls prevents concurrent
+	// calls from overwriting each other's global callback references.
+	private final ExecutorService geminiExecutor = Executors.newSingleThreadExecutor();
 	
 	private String icon = "";
 	private String title = "";
@@ -48,6 +54,18 @@ public class WebAppInterface {
 		this.activity = activity;
 		this.web = web;
 		this.audioManager = (AudioManager) activity.getSystemService(Context.AUDIO_SERVICE);
+	}
+
+	/**
+	 * FIX #4 helper: Escapes characters that would break a JS template literal.
+	 * Prevents XSS / template-injection when inserting arbitrary server responses
+	 * into evaluateJavascript(`...`).
+	 */
+	private static String escapeForJsTemplateLiteral(String s) {
+		if (s == null) return "";
+		return s.replace("\\", "\\\\")   // backslash first
+		        .replace("`", "\\`")      // backtick
+		        .replace("${", "\\${");   // template expression opener
 	}
 	
 	@JavascriptInterface
@@ -89,20 +107,36 @@ public class WebAppInterface {
 			return "1.0";
 		}
 	}
+
 	@JavascriptInterface
 	public boolean isWebViewSupported() {
 		return WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_ARRAY_BUFFER);
 	}
 	
+	// FIX #2: hasStoragePermission() was returning INVERTED result.
+	// Original: return (checkSelfPermission(...) == PERMISSION_DENIED || ...)
+	// PERMISSION_DENIED = -1, so the expression was true when DENIED → JS got
+	// told it HAS permission when it didn't and vice versa. Downloads broke silently.
+	// Fixed: return true only when both permissions are GRANTED.
 	@JavascriptInterface
 	public boolean hasStoragePermission() {
-		if (Build.VERSION.SDK_INT > 22 && Build.VERSION.SDK_INT < Build.VERSION_CODES.R){
-			if (activity.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_DENIED || activity.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_DENIED) {
-				activity.runOnUiThread(() -> Toast.makeText(activity, R.string.grant_storage, Toast.LENGTH_SHORT).show());
-				activity.requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE,Manifest.permission.READ_EXTERNAL_STORAGE}, 1);
+		if (Build.VERSION.SDK_INT > 22 && Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+			boolean writeDenied = activity.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+			        == PackageManager.PERMISSION_DENIED;
+			boolean readDenied  = activity.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE)
+			        == PackageManager.PERMISSION_DENIED;
+			if (writeDenied || readDenied) {
+				activity.runOnUiThread(() ->
+				        Toast.makeText(activity, R.string.grant_storage, Toast.LENGTH_SHORT).show());
+				activity.requestPermissions(new String[]{
+				        Manifest.permission.WRITE_EXTERNAL_STORAGE,
+				        Manifest.permission.READ_EXTERNAL_STORAGE
+				}, 1);
+				return false; // FIX: was incorrectly returning true (DENIED) before
 			}
-			return (activity.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_DENIED || activity.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_DENIED);
+			return true; // FIX: both permissions granted → correctly return true
 		}
+		// Android 11+ (API 30+): no WRITE_EXTERNAL_STORAGE needed; always true
 		return true;
 	}
 	
@@ -131,7 +165,6 @@ public class WebAppInterface {
 		MediaMuxerUtils.muxVideoAudio(activity.getApplicationContext(), video, audio, output, new MediaMuxerUtils.MuxCallback() {
 			@Override
 			public void onSuccess(File output) {
-				// safe to update UI here — already on main thread
 				Toast.makeText(activity, "Done: " + output.getName(), Toast.LENGTH_SHORT).show();
 			}
 			
@@ -201,26 +234,46 @@ public class WebAppInterface {
 		.putExtra("subtitle", subtitle).putExtra("duration", duration)
 		.putExtra("currentPosition", ct).putExtra("action", action));
 	}
-	
+
+	// FIX #4 + FIX #5: getSNlM0e now uses the dedicated geminiExecutor (single-thread)
+	// so concurrent calls queue up instead of racing. The response is escaped via
+	// escapeForJsTemplateLiteral() to prevent template-literal injection / XSS.
 	@JavascriptInterface
 	public void getSNlM0e(String cookies) {
-		new Thread(() -> {
+		geminiExecutor.submit(() -> {
 			String response = GeminiWrapper.getSNlM0e(cookies);
-			activity.runOnUiThread(() -> web.evaluateJavascript("callbackSNlM0e.resolve(`" + response + "`)", null));
-		}).start();
+			// FIX #4: escape response so backticks/$ in it don't break the JS template literal
+			String safe = escapeForJsTemplateLiteral(response);
+			activity.runOnUiThread(() ->
+			        web.evaluateJavascript("callbackSNlM0e.resolve(`" + safe + "`)", null));
+		});
 	}
-	
+
+	// FIX #4 + FIX #5: same executor + safer JSON insertion for GeminiClient.
+	// GeminiClient passes a JSON object (not a template literal), so we validate
+	// the JSONObject before passing it — if null, we resolve with null.
 	@JavascriptInterface
 	public void GeminiClient(String url, String headers, String body) {
-		new Thread(() -> {
+		geminiExecutor.submit(() -> {
 			JSONObject response = GeminiWrapper.getStream(url, headers, body);
-			activity.runOnUiThread(() -> web.evaluateJavascript("callbackGeminiClient.resolve(" + response + ")", null));
-		}).start();
+			// FIX #4: safe JSON string — JSONObject.toString() is already valid JSON;
+			// no template literal is used here so injection risk is minimal,
+			// but we still guard against null to prevent "callbackGeminiClient.resolve(null)"
+			// from breaking if the JS side doesn't expect it.
+			String jsonStr = (response != null) ? response.toString() : "null";
+			activity.runOnUiThread(() ->
+			        web.evaluateJavascript("callbackGeminiClient.resolve(" + jsonStr + ")", null));
+		});
 	}
-	
+
+	// FIX #30: getAllCookies — added null/empty URL guard and null-safe return.
+	// CookieManager.getCookie() is safe to call from any thread (Binder or main),
+	// but it can return null for unknown URLs — guard added to prevent NPE on JS side.
 	@JavascriptInterface
 	public String getAllCookies(String url) {
-		return CookieManager.getInstance().getCookie(url);
+		if (url == null || url.isEmpty()) return "";
+		String cookies = CookieManager.getInstance().getCookie(url);
+		return (cookies != null) ? cookies : "";
 	}
 	
 	@JavascriptInterface
@@ -284,9 +337,6 @@ public class WebAppInterface {
 		});
 	}
 
-	// ---- Privacy: optional proxy for region-locked content ----
-	// Note: this is a plain HTTP/HTTPS or SOCKS proxy the user points at themselves
-	// (e.g. a proxy they run or subscribe to) — the app does not bundle or operate any proxy server.
 	@JavascriptInterface
 	public void setProxy(String host, String port, boolean enable) {
 		if (!WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
@@ -321,7 +371,6 @@ public class WebAppInterface {
 		return host + ":" + port;
 	}
 
-	// ---- Generic encrypted key/value storage (for anything sensitive added later) ----
 	@JavascriptInterface
 	public void setSecure(String key, String value) {
 		SecurePrefs.putString(activity, key, value);
@@ -332,14 +381,10 @@ public class WebAppInterface {
 		return SecurePrefs.getString(activity, key, "");
 	}
 
-	// ---- Download history: open a previously downloaded file with the system viewer ----
 	@JavascriptInterface
 	public void openDownloadedFile(String filename) {
 		activity.runOnUiThread(() -> {
 			try {
-				// SECURITY: never trust a path from JS directly — strip any directory
-				// components so this can only ever open a file inside our own Downloads
-				// folders, never escape via "../" into other app/OS storage.
 				String safeName = new java.io.File(filename).getName();
 
 				java.io.File root = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
@@ -382,10 +427,8 @@ public class WebAppInterface {
 		return "*/*";
 	}
 
-	// ---- Audio-only extraction (saves the already-downloaded audio track as its own file) ----
 	@JavascriptInterface
 	public void extractAudioOnly(String audioFileName, String outputFileName) {
-		// SECURITY: strip any directory components from JS-supplied filenames.
 		audioFileName = new java.io.File(audioFileName).getName();
 		outputFileName = new java.io.File(outputFileName).getName();
 

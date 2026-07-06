@@ -45,16 +45,21 @@ public class BinaryStreamManager {
         if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_ARRAY_BUFFER)) {
             Log.e("YTPRO_STREAM", "ArrayBuffer not supported on this device.");
             Toast.makeText(context, "ArrayBuffer not supported on this device.", Toast.LENGTH_SHORT).show();
-   
             return;
         }
-        
 
         WebMessagePortCompat[] channel = WebViewCompat.createWebMessageChannel(webView);
         WebMessagePortCompat localPort = channel[0];
         WebMessagePortCompat jsPort = channel[1];
 
-        // 1. Open file stream asynchronously
+        // FIX #22: Previously the file stream was opened asynchronously BUT the port callback
+        // was registered and the port was sent to JS synchronously right after — meaning chunks
+        // could arrive before the stream was even open. fileStreams.get(fileName) would return
+        // null and chunks were silently dropped → corrupted/empty file.
+        //
+        // Fix: open the stream first, then set up the callback and send the port to JS only
+        // after the stream is successfully open. All of this runs on ioExecutor so the WebView
+        // thread is never blocked.
         ioExecutor.execute(() -> {
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -91,18 +96,38 @@ public class BinaryStreamManager {
                     );
                     if (!dir.exists()) dir.mkdirs();
                     File file = new File(dir, fileName);
-                    FileOutputStream fos = new FileOutputStream(file, true);
+
+                    // FIX #23: was FileOutputStream(file, true) — append mode.
+                    // If the same filename existed from a failed/partial previous download,
+                    // new data was appended to the old data → corrupted file.
+                    // Fixed to false (overwrite/truncate) so each download starts clean.
+                    FileOutputStream fos = new FileOutputStream(file, false);
                     legacyStreams.put(fileName, fos);
                 }
 
                 Log.d("YTPRO_STREAM", "Stream opened for: " + fileName);
 
+                // FIX #22: Only NOW — after the stream is confirmed open — register the
+                // message callback and post the port to JS. This guarantees no chunk can
+                // arrive before the stream is ready to receive it.
+                webView.post(() -> setupPortCallback(localPort, jsPort, fileName));
+
             } catch (Exception e) {
                 Log.e("YTPRO_STREAM", "Failed to open stream: " + e.getMessage());
+                // Port was never sent to JS, so JS side will time out waiting for its port.
+                // Close local port to avoid a dangling reference.
+                try { localPort.close(); } catch (Exception ignored) {}
             }
         });
+    }
 
-        // 2. This port only listens for chunks belonging to THIS file
+    /**
+     * FIX #22: Separated into its own method so it is only invoked AFTER the file
+     * stream is confirmed open (called from webView.post() inside ioExecutor).
+     */
+    private void setupPortCallback(WebMessagePortCompat localPort,
+                                   WebMessagePortCompat jsPort,
+                                   String fileName) {
         localPort.setWebMessageCallback(new WebMessagePortCompat.WebMessageCallbackCompat() {
             @Override
             public void onMessage(WebMessagePortCompat port, WebMessageCompat message) {
@@ -112,9 +137,11 @@ public class BinaryStreamManager {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                                 OutputStream os = fileStreams.get(fileName);
                                 if (os != null) os.write(message.getArrayBuffer());
+                                else Log.w("YTPRO_STREAM", "Chunk dropped — stream not ready for: " + fileName);
                             } else {
                                 FileOutputStream fos = legacyStreams.get(fileName);
                                 if (fos != null) fos.write(message.getArrayBuffer());
+                                else Log.w("YTPRO_STREAM", "Chunk dropped — legacy stream not ready for: " + fileName);
                             }
                         } catch (Exception e) {
                             Log.e("YTPRO_STREAM", "Write failed: " + e.getMessage());
@@ -129,7 +156,7 @@ public class BinaryStreamManager {
                                     os.flush();
                                     os.close();
                                 }
-                                // Mark file as visible
+                                // Mark file as visible in media scanner
                                 Uri uri = fileUris.remove(fileName);
                                 if (uri != null) {
                                     ContentValues values = new ContentValues();
@@ -149,13 +176,15 @@ public class BinaryStreamManager {
 
                         } catch (Exception e) {
                             Log.e("YTPRO_STREAM", "Close failed: " + e.getMessage());
+                            // Ensure port is closed even on failure to avoid resource leak
+                            try { port.close(); } catch (Exception ignored) {}
                         }
                     }
                 });
             }
         });
 
-        // 3. Send the port back to JS tagged with the filename
+        // Send the port to JS tagged with the filename — JS can now start sending chunks
         WebViewCompat.postWebMessage(
                 webView,
                 new WebMessageCompat("PORT_FOR:" + fileName, new WebMessagePortCompat[]{jsPort}),
