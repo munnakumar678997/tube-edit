@@ -534,7 +534,30 @@ setTimeout(()=>{ try{ ytproApplyPreferredQuality(); }catch(e){} }, 2500);
 
 // ---- Ensure the next video auto-plays when this one ends ----
 // (loop is intentionally off, but YouTube's own "autoplay next" sometimes
-// doesn't fire — this is a safety net that forces it after a short wait.)
+// doesn't fire, especially while minimized — so we fetch the real "up next"
+// video ourselves via the Innertube API and navigate straight to it if
+// needed. This is more reliable than trying to click YouTube's own UI.)
+(async function ytproPrefetchNextVideo(){
+try{
+var vid = new URLSearchParams(window.location.search).get("v") ||
+(window.location.pathname.indexOf("shorts") > -1 ? window.location.pathname.split("/shorts/")[1] : null);
+if(!vid) return;
+
+const { Innertube } = await import('https://cdn.jsdelivr.net/npm/youtubei.js@17.0.1/bundle/browser.min.js');
+const cookies = window.Android?.getAllCookies?.('https://www.youtube.com') ?? '';
+const yt = await Innertube.create({ cookie: cookies, generate_session_locally: true });
+const info = await yt.getInfo(vid);
+
+var nextId =
+info?.watch_next_feed?.[0]?.id ||
+info?.watch_next_feed?.[0]?.content?.video_id ||
+info?.watch_next_feed?.[0]?.content?.id ||
+null;
+
+if(nextId){ window.__ytproNextVideoId = nextId; }
+}catch(e){ console.error('[YTPRO] prefetch next video failed', e); }
+})();
+
 var videoEl = document.getElementsByClassName('video-stream')[0];
 if(videoEl && !videoEl.__ytproEndedBound){
 videoEl.__ytproEndedBound = true;
@@ -544,15 +567,11 @@ if(localStorage.getItem("loopVid") === "true") return; // user wants this video 
 setTimeout(()=>{
 var v = document.getElementsByClassName('video-stream')[0];
 // Still sitting on the ended frame after ~2.5s? YouTube's own autoplay
-// didn't kick in — most likely its "Autoplay" toggle is off. Turn it on.
-if(v && v.ended){
+// didn't kick in — jump straight to the "up next" video we prefetched.
+if(v && v.ended && window.__ytproNextVideoId){
 try{
-var autoplayToggle = ytproFindByText(document.body, "Autoplay");
-if(autoplayToggle){
-var toggleBox = autoplayToggle.closest('[role="button"], button, div');
-var toggleSwitch = toggleBox ? toggleBox.querySelector('[role="switch"][aria-checked="false"]') : null;
-if(toggleSwitch){ toggleSwitch.click(); }
-}
+var nextUrl = "https://m.youtube.com/watch?v=" + window.__ytproNextVideoId;
+window.navigation.navigate(nextUrl);
 }catch(e){}
 }
 }, 2500);
@@ -1633,18 +1652,36 @@ return node.closest('[role="button"], button, li, div') || node;
 return null;
 }
 
+function ytproFindSettingsGear(playerRoot){
+var rect = playerRoot.getBoundingClientRect();
+var candidates = playerRoot.querySelectorAll('button, [role="button"]');
+for(var el of candidates){
+var r = el.getBoundingClientRect();
+if(r.width === 0 || r.height === 0) continue;
+if(r.width > 60 || r.height > 60) continue; // must be a small icon button, not a big card
+var label = (el.getAttribute('aria-label') || el.getAttribute('title') || '').toLowerCase();
+if(label.includes('setting') || label.includes('more video') || label.includes('quality') || label.includes('options')){
+return el;
+}
+}
+return null;
+}
+
 function ytproApplyPreferredQuality(){
 try{
 var preferred = localStorage.getItem("ytproPreferredQuality") || "144p";
 if(preferred === "Auto") return; // Auto is YouTube's own default, nothing to do
 
-// Only look inside the actual video player for its OWN settings gear —
-// never the app-level top-bar menu (that one has "Sign In/Settings/
-// Feedback" and is a completely different, unrelated menu).
 var playerRoot = document.getElementById('player-container-id');
 if(!playerRoot) return;
 
-var settingsBtn = playerRoot.querySelector('.ytp-settings-button, [aria-label="Settings"], [aria-label="Video settings"], [aria-label="More video actions"]');
+// The settings gear is often only rendered/visible after the player
+// controls are revealed (a tap on the video). Reveal them first.
+var vEl = playerRoot.getElementsByClassName('video-stream')[0];
+if(vEl){ vEl.click(); }
+
+setTimeout(()=>{
+var settingsBtn = ytproFindSettingsGear(playerRoot);
 if(!settingsBtn) return;
 settingsBtn.click();
 
@@ -1658,6 +1695,7 @@ var qualityOption = ytproFindByText(document.body, preferred);
 if(qualityOption){ qualityOption.click(); }
 }, 350);
 }, 350);
+}, 300);
 }catch(e){ console.error('[YTPRO] auto-quality failed', e); }
 }
 
