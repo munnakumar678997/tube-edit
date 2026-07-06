@@ -570,15 +570,19 @@ null;
 // The old code used __ytproEndedBound = true once and never reset it, so the
 // 'ended' listener was only bound on the FIRST video — subsequent videos in the
 // same session never triggered auto-next or respected the loop setting.
-// Fix: bind by video ID so each new video gets a fresh listener.
+// Fix: bind by video ID, removing the old listener before adding the new one so
+// they don't accumulate across navigations (review finding: listener accumulation).
 var videoEl = document.getElementsByClassName('video-stream')[0];
 var _curVidId = new URLSearchParams(window.location.search).get('v') ||
                 window.location.pathname.replace("/shorts/","").split("/").pop() || "";
 if(videoEl && videoEl.__ytproEndedBoundVid !== _curVidId){
-videoEl.__ytproEndedBoundVid = _curVidId;
-// Also update loop for this video (FIX #8: loop wasn't being set on SPA navigation)
-videoEl.loop = localStorage.getItem("loopVid") === "true";
-videoEl.addEventListener('ended', function _ytproEndedHandler(){
+// Remove any previously-attached ended handler before adding the new one.
+// Without this, each SPA navigation stacks another listener on the same element.
+if(videoEl.__ytproEndedHandler){
+  videoEl.removeEventListener('ended', videoEl.__ytproEndedHandler);
+}
+// Create a named handler we can remove later.
+videoEl.__ytproEndedHandler = async function _ytproEndedHandler(){
 if(localStorage.getItem("loopVid") === "true") return; // user wants this video to loop
 
 setTimeout(async ()=>{
@@ -601,7 +605,11 @@ if(window.navigation && typeof window.navigation.navigate === 'function'){
 }catch(e){}
 }
 }, 2500);
-});
+};
+videoEl.addEventListener('ended', videoEl.__ytproEndedHandler);
+videoEl.__ytproEndedBoundVid = _curVidId;
+// Also update loop for this video (FIX #8: loop wasn't being set on SPA navigation)
+videoEl.loop = localStorage.getItem("loopVid") === "true";
 }
 
 }

@@ -6,6 +6,14 @@
 	<uses-permission android:name="android.permission.RECORD_AUDIO" />
 	<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 	
+<!--
+  Storage permissions only apply on API 21-28 (Android 5.0-9.0).
+  API 29 (Android 10) uses MediaStore for downloads without needing these runtime
+  permissions (BinaryStreamManager API 29+ path). API 30+ (Android 11+) also
+  needs neither — so maxSdkVersion="28" is correct for the manifest.
+  The Java code must NOT check for these permissions on API 29; it must treat
+  API 29 the same as API 30+ (always granted for MediaStore-based downloads).
+-->
 <uses-permission
     android:name="android.permission.READ_EXTERNAL_STORAGE"
     android:maxSdkVersion="28" />
@@ -77,10 +85,16 @@
 				<data android:mimeType="text/plain" />
 			</intent-filter>
 		</activity>
+		<!--
+		  ForegroundService: exported="false" — only our own app (via startService /
+		  startForegroundService) should be able to start it. Any external app
+		  that could start it could send crafted icon Base64 payloads and trigger
+		  crashes or fake media notifications.
+		-->
 		<service
 			android:name=".ForegroundService"
 			android:enabled="true"
-			android:exported="true"
+			android:exported="false"
 			android:foregroundServiceType="mediaPlayback"
 			/>
 

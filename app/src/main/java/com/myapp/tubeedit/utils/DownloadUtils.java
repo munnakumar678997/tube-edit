@@ -15,7 +15,10 @@ import com.myapp.tubeedit.R;
 public class DownloadUtils {
 
     public static void downloadFile(Activity activity, String filename, String url, String mtype) {
-        if (Build.VERSION.SDK_INT > 22 && Build.VERSION.SDK_INT < Build.VERSION_CODES.R &&
+        // Only check WRITE_EXTERNAL_STORAGE on API 23-28; API 29+ uses MediaStore
+        // and does not need (or have) this runtime permission.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
             activity.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_DENIED) {
             
             activity.runOnUiThread(() -> Toast.makeText(activity, R.string.grant_storage, Toast.LENGTH_SHORT).show());

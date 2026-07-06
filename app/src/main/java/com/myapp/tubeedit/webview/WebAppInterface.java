@@ -118,9 +118,23 @@ public class WebAppInterface {
 	// PERMISSION_DENIED = -1, so the expression was true when DENIED → JS got
 	// told it HAS permission when it didn't and vice versa. Downloads broke silently.
 	// Fixed: return true only when both permissions are GRANTED.
+	//
+	// Permission scope (aligned with manifest maxSdkVersion="28"):
+	//   API 21-22:  runtime permission model not enforced — always granted
+	//   API 23-28:  WRITE/READ runtime permissions required and checked here
+	//   API 29   :  MediaStore used for downloads; NO runtime WRITE/READ needed
+	//   API 30+  :  MediaStore only; WRITE_EXTERNAL_STORAGE removed entirely
 	@JavascriptInterface
 	public boolean hasStoragePermission() {
-		if (Build.VERSION.SDK_INT > 22 && Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+		// API 29+ (Android 10+): downloads go through MediaStore and do not
+		// require WRITE_EXTERNAL_STORAGE / READ_EXTERNAL_STORAGE runtime permissions.
+		// Checking for them on API 29 always fails (maxSdkVersion="28") and would
+		// incorrectly block downloads.
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+			return true;
+		}
+		// API 23-28: check and request runtime permissions
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
 			boolean writeDenied = activity.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
 			        == PackageManager.PERMISSION_DENIED;
 			boolean readDenied  = activity.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE)
@@ -132,12 +146,10 @@ public class WebAppInterface {
 				        Manifest.permission.WRITE_EXTERNAL_STORAGE,
 				        Manifest.permission.READ_EXTERNAL_STORAGE
 				}, 1);
-				return false; // FIX: was incorrectly returning true (DENIED) before
+				return false;
 			}
-			return true; // FIX: both permissions granted → correctly return true
 		}
-		// Android 11+ (API 30+): no WRITE_EXTERNAL_STORAGE needed; always true
-		return true;
+		return true; // API ≤ 22 or permissions granted
 	}
 	
 	@JavascriptInterface
