@@ -486,22 +486,37 @@ fDislikes(window.location.href);
 checkSponsors(window.location.href);
 
 
-if((window.location.pathname.indexOf("watch") > -1) || (window.location.pathname.indexOf("shorts") > -1)){
+function ytproOnVideoPageLoad(){
+
 var unV=setInterval(() => {
 
-
 /*Unmute The Video*/ 
+var vEl = document.getElementsByClassName('video-stream')[0];
+if(!vEl){ return; }
+vEl.muted=false;
+vEl.loop = localStorage.getItem("loopVid") === "true";
 
-document.getElementsByClassName('video-stream')[0].muted=false;
-document.getElementsByClassName('video-stream')[0].loop = localStorage.getItem("loopVid") === "true";
-
-if(!document.getElementsByClassName('video-stream')[0].muted){
+if(!vEl.muted){
 clearInterval(unV);
-
 }
 
 }, 5);
 
+// Preload the mini-player's background feed a couple seconds after a
+// video/shorts page loads, so by the time the user swipes down to minimize,
+// the feed behind the shrunk video is already loaded (no blank/skeleton flash).
+setTimeout(()=>{
+if(localStorage.getItem("gesM") == "true"){
+try{ ytproCreateMiniIframe(); }catch(e){}
+}
+}, 3000);
+
+setTimeout(()=>{ try{ ytproApplyPreferredQuality(); }catch(e){} }, 2500);
+
+}
+
+if((window.location.pathname.indexOf("watch") > -1) || (window.location.pathname.indexOf("shorts") > -1)){
+ytproOnVideoPageLoad();
 }
 
 /*Funtion to set Element Styles*/
@@ -1465,6 +1480,10 @@ if(e.destination.url.indexOf("watch") > -1 || e.destination.url.indexOf("shorts"
   dislikes="...";
 fDislikes(e.destination.url);
 checkSponsors(e.destination.url);
+// Re-run unmute/miniplayer-preload/quality-automation for THIS video too —
+// these previously only ran once on the very first page load and never
+// again after switching videos via in-page (SPA) navigation.
+setTimeout(()=>{ try{ ytproOnVideoPageLoad(); }catch(e){} }, 400);
 }else{
 // Remember the last non-video page the user was on (home feed, search
 // results, a channel page, etc.) so the miniplayer can restore exactly
@@ -1554,16 +1573,7 @@ return iframe;
 
 }
 
-// Preload the mini-player's background feed a couple seconds after a
-// video/shorts page loads, so by the time the user swipes down to minimize,
-// the feed behind the shrunk video is already loaded (no blank/skeleton flash).
-if((window.location.pathname.indexOf("watch") > -1) || (window.location.pathname.indexOf("shorts") > -1)){
-setTimeout(()=>{
-if(localStorage.getItem("gesM") == "true"){
-try{ ytproCreateMiniIframe(); }catch(e){}
-}
-}, 3000);
-}
+// (mini-player preload now happens inside ytproOnVideoPageLoad, re-run on every video)
 
 // ---- Preferred playback quality: default 144p, remembers manual changes ----
 function ytproFindByText(root, text){
@@ -1582,7 +1592,13 @@ try{
 var preferred = localStorage.getItem("ytproPreferredQuality") || "144p";
 if(preferred === "Auto") return; // Auto is YouTube's own default, nothing to do
 
-var settingsBtn = document.querySelector('.ytp-settings-button, [aria-label="Settings"], [aria-label="More options"]');
+// Only look inside the actual video player for its OWN settings gear —
+// never the app-level top-bar menu (that one has "Sign In/Settings/
+// Feedback" and is a completely different, unrelated menu).
+var playerRoot = document.getElementById('player-container-id');
+if(!playerRoot) return;
+
+var settingsBtn = playerRoot.querySelector('.ytp-settings-button, [aria-label="Settings"], [aria-label="Video settings"], [aria-label="More video actions"]');
 if(!settingsBtn) return;
 settingsBtn.click();
 
@@ -1599,9 +1615,7 @@ if(qualityOption){ qualityOption.click(); }
 }catch(e){ console.error('[YTPRO] auto-quality failed', e); }
 }
 
-if((window.location.pathname.indexOf("watch") > -1) || (window.location.pathname.indexOf("shorts") > -1)){
-setTimeout(ytproApplyPreferredQuality, 2500);
-}
+// (quality automation now happens inside ytproOnVideoPageLoad, re-run on every video)
 
 // If the user manually picks a quality from YouTube's own menu, remember it.
 document.body.addEventListener('click', (e)=>{
