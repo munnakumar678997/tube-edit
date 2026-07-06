@@ -1581,6 +1581,11 @@ stopProp=false;
 if(window.navigation && typeof window.navigation.addEventListener === 'function'){
 navigation.addEventListener("navigate", e => {
 if(e.destination.url.indexOf("watch") > -1 || e.destination.url.indexOf("shorts") > -1){
+  // FIX: If the mini-player is active when the user taps a new video,
+  // restore the player to full-size BEFORE the new video page loads.
+  // Without this, the player stays in its shrunken/fixed position and the
+  // new video renders into a black-screen-sized box.
+  if(window.ytproIsMinimized){ try{ minimize(false); }catch(err){} }
   dislikes="...";
 fDislikes(e.destination.url);
 checkSponsors(e.destination.url);
@@ -1601,6 +1606,8 @@ try{ sessionStorage.setItem("ytproLastFeedUrl", e.destination.url); }catch(err){
 window.addEventListener('popstate', function(ev){
   var href = window.location.href;
   if(href.indexOf("watch") > -1 || href.indexOf("shorts") > -1){
+    // Same fix: restore mini-player before new video loads.
+    if(window.ytproIsMinimized){ try{ minimize(false); }catch(err){} }
     dislikes="...";
     fDislikes(href);
     checkSponsors(href);
@@ -1720,13 +1727,26 @@ return null;
 }
 
 function ytproApplyPreferredQuality(){
-// DISABLED: simulating a tap on the video to reveal controls was pausing/
-// breaking playback for everyone (a tap on YouTube's video area toggles
-// play/pause). This automation isn't safe without deeper access to
-// YouTube's own player internals, so it's turned off for now. The user's
-// preferred-quality choice is still saved and available if a safer way
-// to apply it is found later.
-return;
+// Use YouTube's internal movie_player API to set quality without simulating
+// any tap/click (which was breaking playback). 'tiny'=144p, 'small'=240p, etc.
+var pref = localStorage.getItem("ytproPreferredQuality") || "144p";
+if(pref === "Auto") return; // Auto means let YouTube decide — nothing to do
+var qMap = {"144p":"tiny","240p":"small","360p":"medium","480p":"large","720p":"hd720","1080p":"hd1080"};
+var ytQ = qMap[pref];
+if(!ytQ) return;
+var attempt = 0;
+var timer = setInterval(function(){
+  attempt++;
+  if(attempt > 20){ clearInterval(timer); return; } // give up after 10s
+  try{
+    var player = document.getElementById('movie_player');
+    if(player && typeof player.setPlaybackQuality === 'function'){
+      player.setPlaybackQuality(ytQ);
+      if(typeof player.setPlaybackQualityRange === 'function') player.setPlaybackQualityRange(ytQ, ytQ);
+      clearInterval(timer);
+    }
+  }catch(err){}
+}, 500);
 }
 
 // (quality automation now happens inside ytproOnVideoPageLoad, re-run on every video)
@@ -1855,9 +1875,12 @@ closeBtn.innerHTML = '&#10005;';
 closeBtn.style.cssText = 'position:absolute;top:4px;right:4px;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;font-size:14px;display:flex;align-items:center;justify-content:center;z-index:10001;';
 closeBtn.addEventListener('click', (e)=>{
 e.stopPropagation();
+// FIX: X button should dismiss the video entirely (go back to feed),
+// not expand/restore it. minimize(false) was just restoring full-size.
 var v = document.getElementsByClassName('video-stream')[0];
 if(v) v.pause();
-minimize(false);
+var feedUrl = sessionStorage.getItem("ytproLastFeedUrl") || "https://m.youtube.com/";
+try{ window.navigation.navigate(feedUrl); }catch(err){ window.location.href = feedUrl; }
 });
 player.appendChild(closeBtn);
 }
