@@ -146,7 +146,7 @@ public class YTProWebViewClient extends WebViewClient {
 				String line;
 				while ((line = reader.readLine()) != null) {
 					if (line.toLowerCase().contains("content-security-policy")) {
-						line = line.replaceAll("<meta[^>]*http-equiv=[\"']?Content-Security-Policy[\"']?[^>]*>", "");
+						line = line.replaceAll("(?i)<meta[^>]*http-equiv=[\"']?Content-Security-Policy[\"']?[^>]*>", "");
 					}
 					html.append(line).append("\n");
 				}

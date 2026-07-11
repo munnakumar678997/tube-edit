@@ -19,6 +19,7 @@ public class MediaCommandReceiver extends BroadcastReceiver {
         if (intent.getExtras() == null) return;
         
         String action = intent.getExtras().getString("actionname");
+        if (action == null) return;
         Log.e("Action MainActivity", action);
 
         switch (action) {
@@ -35,7 +36,11 @@ public class MediaCommandReceiver extends BroadcastReceiver {
                 web.evaluateJavascript("playPrev();", null);
                 break;
             case "SEEKTO":
-                web.evaluateJavascript("seekTo('" + intent.getExtras().getString("pos") + "');", null);
+                String pos = intent.getExtras().getString("pos", "0");
+                // Only allow digits/decimal point — this value gets interpolated into a
+                // JS string, so anything else could be a JS-injection attempt.
+                if (pos == null || !pos.matches("[0-9.]+")) return;
+                web.evaluateJavascript("seekTo('" + pos + "');", null);
                 break;
         }
     }

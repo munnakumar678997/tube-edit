@@ -15,7 +15,7 @@ var script = document.createElement('script'); script.src="//youtube.com/ytpro_c
 if(!YTProVer){
 
 /*Few Stupid Inits*/
-var YTProVer="1.0.0";
+var YTProVer="1.0.2";
 var ytoldV="";
 var isF=false;   //what is this for?
 var isAp=false; // oh it's for bg play 
@@ -236,7 +236,9 @@ var addSettingsTab=()=>{
 if(document.getElementById("setDiv") == null){
 var setDiv=document.createElement("div");
 setDiv.setAttribute("style",`
-z-index:9999999999;
+// FIX #17: z-index:9999999999 is absurdly high and causes unpredictable layering
+// with YouTube's own overlays. 9999 is sufficient for any in-page stacking.
+z-index:9999;
 font-size:22px;
 text-align:center;
 line-height:35px;
@@ -424,7 +426,7 @@ backdrop-filter:blur(6px);
 position:absolute;bottom:40px;
 line-height:50px;
 left:calc(15% / 2 );padding-left:10px;padding-right:10px;
-z-index:99999999999999;text-align:center;border-radius:25px;
+z-index:9999;text-align:center;border-radius:25px;
 color:white;text-align:center;
 `);
 sSDiv.innerHTML=`<span style="height:30px;line-height:30px;margin-top:10px;display:block;font-family:monospace;font-size:16px;float:left;">Skipped Sponsor</span>
@@ -488,11 +490,17 @@ checkSponsors(window.location.href);
 
 function ytproOnVideoPageLoad(){
 
+var unVAttempts = 0;
 var unV=setInterval(() => {
+
+unVAttempts++;
 
 /*Unmute The Video*/ 
 var vEl = document.getElementsByClassName('video-stream')[0];
-if(!vEl){ return; }
+if(!vEl){
+if(unVAttempts > 100){ clearInterval(unV); } // safety cap: ~10s of retrying, avoid an infinite leaked interval
+return;
+}
 vEl.muted=false;
 vEl.loop = localStorage.getItem("loopVid") === "true";
 
@@ -505,11 +513,11 @@ var bannerBox = unmuteBanner.closest('button, [role="button"], div') || unmuteBa
 bannerBox.style.display = 'none';
 }
 
-if(!vEl.muted){
+if(!vEl.muted || unVAttempts > 100){
 clearInterval(unV);
 }
 
-}, 5);
+}, 100);
 
 setTimeout(()=>{
 var unmuteBanner2 = ytproFindByText(document.body, "TAP TO UNMUTE");
@@ -540,13 +548,19 @@ setTimeout(()=>{ try{ ytproApplyPreferredQuality(); }catch(e){} }, 2500);
 // NOTE: this fetch only happens once the video actually ends — not while
 // it's playing — so it never competes with the video's own streaming for
 // bandwidth/CPU.
+// FIX #7: Import had no timeout — if cdn.jsdelivr.net was slow or down,
+// ytproFetchNextVideoId hung forever. Fixed with 8s timeout via Promise.race().
 async function ytproFetchNextVideoId(){
 try{
 var vid = new URLSearchParams(window.location.search).get("v") ||
 (window.location.pathname.indexOf("shorts") > -1 ? window.location.pathname.split("/shorts/")[1] : null);
 if(!vid) return null;
 
-const { Innertube } = await import('https://cdn.jsdelivr.net/npm/youtubei.js@17.0.1/bundle/browser.min.js');
+// FIX #7: race the import against an 8-second timeout
+const _importPromise = import('https://cdn.jsdelivr.net/npm/youtubei.js@17.0.1/bundle/browser.min.js');
+const _timeoutPromise = new Promise(function(_,rej){ setTimeout(function(){ rej(new Error('[YTPRO] import timeout')); }, 8000); });
+const { Innertube } = await Promise.race([_importPromise, _timeoutPromise]);
+
 const cookies = window.Android?.getAllCookies?.('https://www.youtube.com') ?? '';
 const yt = await Innertube.create({ cookie: cookies, generate_session_locally: true });
 const info = await yt.getInfo(vid);
@@ -558,11 +572,24 @@ null;
 }catch(e){ console.error('[YTPRO] fetch next video failed', e); return null; }
 }
 
+// FIX #8: YouTube SPA reuses the same <video> element across video navigations.
+// The old code used __ytproEndedBound = true once and never reset it, so the
+// 'ended' listener was only bound on the FIRST video — subsequent videos in the
+// same session never triggered auto-next or respected the loop setting.
+// Fix: bind by video ID, removing the old listener before adding the new one so
+// they don't accumulate across navigations (review finding: listener accumulation).
 var videoEl = document.getElementsByClassName('video-stream')[0];
-if(videoEl && !videoEl.__ytproEndedBound){
-videoEl.__ytproEndedBound = true;
-videoEl.addEventListener('ended', ()=>{
-if(localStorage.getItem("loopVid") === "true") return; // user wants this video to loop, leave it alone
+var _curVidId = new URLSearchParams(window.location.search).get('v') ||
+                window.location.pathname.replace("/shorts/","").split("/").pop() || "";
+if(videoEl && videoEl.__ytproEndedBoundVid !== _curVidId){
+// Remove any previously-attached ended handler before adding the new one.
+// Without this, each SPA navigation stacks another listener on the same element.
+if(videoEl.__ytproEndedHandler){
+  videoEl.removeEventListener('ended', videoEl.__ytproEndedHandler);
+}
+// Create a named handler we can remove later.
+videoEl.__ytproEndedHandler = async function _ytproEndedHandler(){
+if(localStorage.getItem("loopVid") === "true") return; // user wants this video to loop
 
 setTimeout(async ()=>{
 var v = document.getElementsByClassName('video-stream')[0];
@@ -573,12 +600,22 @@ try{
 var nextId = await ytproFetchNextVideoId();
 if(nextId){
 var nextUrl = "https://m.youtube.com/watch?v=" + nextId;
-window.navigation.navigate(nextUrl);
+// FIX #6: window.navigation.navigate() only exists on newer WebViews.
+// Fall back to window.location.href for older devices.
+if(window.navigation && typeof window.navigation.navigate === 'function'){
+  window.navigation.navigate(nextUrl);
+} else {
+  window.location.href = nextUrl;
+}
 }
 }catch(e){}
 }
 }, 2500);
-});
+};
+videoEl.addEventListener('ended', videoEl.__ytproEndedHandler);
+videoEl.__ytproEndedBoundVid = _curVidId;
+// Also update loop for this video (FIX #8: loop wasn't being set on SPA navigation)
+videoEl.loop = localStorage.getItem("loopVid") === "true";
 }
 
 }
@@ -713,7 +750,7 @@ height:65%;width:calc(95% - 20px);overflow:auto;
 background:${isD ? "#212121" : "#f1f1f1"};
 position:fixed;
 bottom:20px;
-z-index:99999999999999;padding:10px;text-align:center;border-radius:25px;color:${c};text-align:center;
+z-index:99999;padding:10px;text-align:center;border-radius:25px;color:${c};text-align:center;
 color:${isD ? "#ccc" : "#444"};`);
 
 ytpSetI.innerHTML=`<style>
@@ -1058,7 +1095,8 @@ var actionsList={
 
     var menu = document.createElement('div');
     menu.id = 'ytproSleepMenu';
-    menu.style.cssText = `position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:${isD ? "#212121" : "#f1f1f1"};border-radius:15px;padding:10px;z-index:999999999999999;box-shadow:0 0 10px rgba(0,0,0,.5);text-align:center;`;
+    // FIX #17: z-index:999999999999999 reduced to 99999
+menu.style.cssText = `position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:${isD ? "#212121" : "#f1f1f1"};border-radius:15px;padding:10px;z-index:99999;box-shadow:0 0 10px rgba(0,0,0,.5);text-align:center;`;
 
     var options = [["Off",0],["15 min",15],["30 min",30],["45 min",45],["60 min",60]];
     options.forEach(([label,mins])=>{
@@ -1160,6 +1198,13 @@ function ytproFormatDuration(sec){
   return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
+function ytproEscapeHtml(str){
+if(!str) return "";
+var div = document.createElement("div");
+div.textContent = str;
+return div.innerHTML;
+}
+
 function renderDownloadHistory(){
   var list = ytpSetI.querySelector("#ytproDownloadHistoryList");
   if(!list) return;
@@ -1179,7 +1224,7 @@ function renderDownloadHistory(){
         ${item.duration ? `<span style="position:absolute;bottom:3px;right:3px;background:rgba(0,0,0,.8);color:#fff;font-size:9px;padding:1px 4px;border-radius:3px;">${ytproFormatDuration(item.duration)}</span>` : ""}
       </div>
       <div data-hist-open="${idx}" style="flex:1;margin-left:10px;overflow:hidden;">
-        <div style="font-size:13px;font-weight:bold;color:${isD ? "#fff" : "#111"};display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.3;">${item.title}</div>
+        <div style="font-size:13px;font-weight:bold;color:${isD ? "#fff" : "#111"};display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.3;">${ytproEscapeHtml(item.title)}</div>
         <div style="font-size:11px;color:${isD ? "#aaa" : "#666"};margin-top:4px;">${typeLabel[item.type] || item.type} · ${ytproTimeAgo(item.date)}</div>
       </div>
       <div data-hist-menu="${idx}" style="flex-shrink:0;padding:6px;font-size:16px;color:${isD ? "#ccc" : "#444"};">⋮</div>
@@ -1543,8 +1588,17 @@ stopProp=false;
 
 
 
+// FIX #32: window.navigation (Navigation API) only exists in Chrome 102+ / newer WebViews.
+// Older Android devices would crash with "navigation is not defined".
+// Guard added: check existence before attaching the listener.
+if(window.navigation && typeof window.navigation.addEventListener === 'function'){
 navigation.addEventListener("navigate", e => {
 if(e.destination.url.indexOf("watch") > -1 || e.destination.url.indexOf("shorts") > -1){
+  // FIX: If the mini-player is active when the user taps a new video,
+  // restore the player to full-size BEFORE the new video page loads.
+  // Without this, the player stays in its shrunken/fixed position and the
+  // new video renders into a black-screen-sized box.
+  if(window.ytproIsMinimized){ try{ minimize(false); }catch(err){} }
   dislikes="...";
 fDislikes(e.destination.url);
 checkSponsors(e.destination.url);
@@ -1559,6 +1613,24 @@ setTimeout(()=>{ try{ ytproOnVideoPageLoad(); }catch(e){} }, 400);
 try{ sessionStorage.setItem("ytproLastFeedUrl", e.destination.url); }catch(err){}
 }
 });
+} else {
+// FIX #32 fallback: for older WebViews without Navigation API, use popstate + hashchange
+// to detect in-page navigation. Not as precise but covers most SPA transitions.
+window.addEventListener('popstate', function(ev){
+  var href = window.location.href;
+  if(href.indexOf("watch") > -1 || href.indexOf("shorts") > -1){
+    // Same fix: restore mini-player before new video loads.
+    if(window.ytproIsMinimized){ try{ minimize(false); }catch(err){} }
+    dislikes="...";
+    fDislikes(href);
+    checkSponsors(href);
+    setTimeout(()=>{ try{ ytproOnVideoPageLoad(); }catch(e){} }, 400);
+  } else {
+    // Track last feed URL in popstate path too (was only tracked in Navigation API path).
+    try{ sessionStorage.setItem("ytproLastFeedUrl", href); }catch(err){}
+  }
+});
+}
 
 
 /*minimize function to mini the video*/
@@ -1595,6 +1667,8 @@ iwindow.trustedTypes.createPolicy('default', {createHTML: (string) => string,cre
 }
 }
 
+// Guard: older WebViews may not support Navigation API on the iframe window
+if(iwindow.navigation && typeof iwindow.navigation.addEventListener === 'function')
 iwindow.navigation.addEventListener("navigate", e => {
 if(e.destination.url.indexOf("youtube.com") > -1){
 if(e.destination.url.indexOf("/watch") > -1 || e.destination.url.indexOf("/shorts") > -1){
@@ -1670,14 +1744,30 @@ return el;
 return null;
 }
 
+var ytproQualityTimer = null; // global so rapid SPA navigations cancel the prior poll
 function ytproApplyPreferredQuality(){
-// DISABLED: simulating a tap on the video to reveal controls was pausing/
-// breaking playback for everyone (a tap on YouTube's video area toggles
-// play/pause). This automation isn't safe without deeper access to
-// YouTube's own player internals, so it's turned off for now. The user's
-// preferred-quality choice is still saved and available if a safer way
-// to apply it is found later.
-return;
+// Use YouTube's internal movie_player API to set quality without simulating
+// any tap/click (which was breaking playback). 'tiny'=144p, 'small'=240p, etc.
+var pref = localStorage.getItem("ytproPreferredQuality") || "144p";
+if(pref === "Auto") return; // Auto means let YouTube decide — nothing to do
+var qMap = {"144p":"tiny","240p":"small","360p":"medium","480p":"large","720p":"hd720","1080p":"hd1080"};
+var ytQ = qMap[pref];
+if(!ytQ) return;
+// Cancel any in-progress quality poll from the previous video so they don't overlap.
+if(ytproQualityTimer){ clearInterval(ytproQualityTimer); ytproQualityTimer = null; }
+var attempt = 0;
+ytproQualityTimer = setInterval(function(){
+  attempt++;
+  if(attempt > 20){ clearInterval(ytproQualityTimer); ytproQualityTimer = null; return; } // give up after 10s
+  try{
+    var player = document.getElementById('movie_player');
+    if(player && typeof player.setPlaybackQuality === 'function'){
+      player.setPlaybackQuality(ytQ);
+      if(typeof player.setPlaybackQualityRange === 'function') player.setPlaybackQualityRange(ytQ, ytQ);
+      clearInterval(ytproQualityTimer); ytproQualityTimer = null;
+    }
+  }catch(err){}
+}, 500);
 }
 
 // (quality automation now happens inside ytproOnVideoPageLoad, re-run on every video)
@@ -1806,9 +1896,12 @@ closeBtn.innerHTML = '&#10005;';
 closeBtn.style.cssText = 'position:absolute;top:4px;right:4px;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;font-size:14px;display:flex;align-items:center;justify-content:center;z-index:10001;';
 closeBtn.addEventListener('click', (e)=>{
 e.stopPropagation();
+// FIX: X button should dismiss the video entirely (go back to feed),
+// not expand/restore it. minimize(false) was just restoring full-size.
 var v = document.getElementsByClassName('video-stream')[0];
 if(v) v.pause();
-minimize(false);
+var feedUrl = sessionStorage.getItem("ytproLastFeedUrl") || "https://m.youtube.com/";
+try{ window.navigation.navigate(feedUrl); }catch(err){ window.location.href = feedUrl; }
 });
 player.appendChild(closeBtn);
 }
@@ -2031,7 +2124,7 @@ var cookies=Android.getAllCookies(window.location.href);
 if(cookies.indexOf("__Secure-1PSID=") < 0){
 GeminiRes.innerHTML=`
 <center style="margin-top:15px">
-<span >Sign in to use Gemini<span>
+<span>Sign in to use Gemini</span>
 <br><br>
 <a href="https://accounts.google.com/ServiceLogin?service=youtube" >
 <button style="background:${c};color:${isD ? "#000" : "#fff"};font-weight:500;height:35px;width:90px;border-radius:25px;text-align:center;line-height:35px;">Sign In</button>
@@ -2414,9 +2507,9 @@ geminiInfo();
 var ytproFavElem=document.createElement("div");
 sty(ytproFavElem);
 if(!isHeart()){
-ytproFavElem.innerHTML=`<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0V0z" fill="none"/><path fill="${c}" d="M19.66 3.99c-2.64-1.8-5.9-.96-7.66 1.1-1.76-2.06-5.02-2.91-7.66-1.1-1.4.96-2.28 2.58-2.34 4.29-.14 3.88 3.3 6.99 8.55 11.76l.1.09c.76.69 1.93.69 2.69-.01l.11-.1c5.25-4.76 8.68-7.87 8.55-11.75-.06-1.7-.94-3.32-2.34-4.28zM12.1 18.55l-.1.1-.1-.1C7.14 14.24 4 11.39 4 8.5 4 6.5 5.5 5 7.5 5c1.54 0 3.04.99 3.57 2.36h1.87C13.46 5.99 14.96 5 16.5 5c2 0 3.5 1.5 3.5 3.5 0 2.89-3.14 5.74-7.9 10.05z"/></svg><span style="margin-left:8px">Heart<span>`;
+ytproFavElem.innerHTML=`<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0V0z" fill="none"/><path fill="${c}" d="M19.66 3.99c-2.64-1.8-5.9-.96-7.66 1.1-1.76-2.06-5.02-2.91-7.66-1.1-1.4.96-2.28 2.58-2.34 4.29-.14 3.88 3.3 6.99 8.55 11.76l.1.09c.76.69 1.93.69 2.69-.01l.11-.1c5.25-4.76 8.68-7.87 8.55-11.75-.06-1.7-.94-3.32-2.34-4.28zM12.1 18.55l-.1.1-.1-.1C7.14 14.24 4 11.39 4 8.5 4 6.5 5.5 5 7.5 5c1.54 0 3.04.99 3.57 2.36h1.87C13.46 5.99 14.96 5 16.5 5c2 0 3.5 1.5 3.5 3.5 0 2.89-3.14 5.74-7.9 10.05z"/></svg><span style="margin-left:8px">Heart</span>`;
 }else{
-ytproFavElem.innerHTML=`<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0V0z" fill="none"/><path fill="${c}" d="M13.35 20.13c-.76.69-1.93.69-2.69-.01l-.11-.1C5.3 15.27 1.87 12.16 2 8.28c.06-1.7.93-3.33 2.34-4.29 2.64-1.8 5.9-.96 7.66 1.1 1.76-2.06 5.02-2.91 7.66-1.1 1.41.96 2.28 2.59 2.34 4.29.14 3.88-3.3 6.99-8.55 11.76l-.1.09z"/></svg><span style="margin-left:8px">Heart<span>`;
+ytproFavElem.innerHTML=`<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0V0z" fill="none"/><path fill="${c}" d="M13.35 20.13c-.76.69-1.93.69-2.69-.01l-.11-.1C5.3 15.27 1.87 12.16 2 8.28c.06-1.7.93-3.33 2.34-4.29 2.64-1.8 5.9-.96 7.66 1.1 1.76-2.06 5.02-2.91 7.66-1.1 1.41.96 2.28 2.59 2.34 4.29.14 3.88-3.3 6.99-8.55 11.76l-.1.09z"/></svg><span style="margin-left:8px">Heart</span>`;
 }
 ytproMainDiv.appendChild(ytproFavElem);
 ytproFavElem.addEventListener("click",()=>{ytProHeart(ytproFavElem);});
@@ -2427,7 +2520,8 @@ ytproFavElem.addEventListener("click",()=>{ytProHeart(ytproFavElem);});
 var ytproDownVidElem=document.createElement("div");
 sty(ytproDownVidElem);
 ytproDownVidElem.style.width="140px";
-ytproDownVidElem.innerHTML=`${downBtn.replace('width="18"','width="24"').replace('height="18"','height="24"')}<span style="margin-left:2px">Download<span>`;
+// FIX #14: was <span>Download<span> (second tag was opening, not closing)
+ytproDownVidElem.innerHTML=`${downBtn.replace('width="18"','width="24"').replace('height="18"','height="24"')}<span style="margin-left:2px">Download</span>`;
 ytproMainDiv.appendChild(ytproDownVidElem);
 ytproDownVidElem.addEventListener("click",
 function(){
@@ -2438,7 +2532,8 @@ window.location.hash="download";
 var ytproPIPVidElem=document.createElement("div");
 sty(ytproPIPVidElem);
 ytproPIPVidElem.style.width="140px";
-ytproPIPVidElem.innerHTML=`<svg xmlns="http://www.w3.org/2000/svg" height="22" viewBox="0 0 24 24" width="22"><path fill="${c}" d="M18 7h-6c-.55 0-1 .45-1 1v4c0 .55.45 1 1 1h6c.55 0 1-.45 1-1V8c0-.55-.45-1-1-1zm3-4H3c-1.1 0-2 .9-2 2v14c0 1.1.9 1.98 2 1.98h18c1.1 0 2-.88 2-1.98V5c0-1.1-.9-2-2-2zm-1 16.01H4c-.55 0-1-.45-1-1V5.98c0-.55.45-1 1-1h16c.55 0 1 .45 1 1v12.03c0 .55-.45 1-1 1z"/></svg><span style="margin-left:8px">PIP Mode<span>`;
+// FIX #14: was <span>PIP Mode<span>
+ytproPIPVidElem.innerHTML=`<svg xmlns="http://www.w3.org/2000/svg" height="22" viewBox="0 0 24 24" width="22"><path fill="${c}" d="M18 7h-6c-.55 0-1 .45-1 1v4c0 .55.45 1 1 1h6c.55 0 1-.45 1-1V8c0-.55-.45-1-1-1zm3-4H3c-1.1 0-2 .9-2 2v14c0 1.1.9 1.98 2 1.98h18c1.1 0 2-.88 2-1.98V5c0-1.1-.9-2-2-2zm-1 16.01H4c-.55 0-1-.45-1-1V5.98c0-.55.45-1 1-1h16c.55 0 1 .45 1 1v12.03c0 .55-.45 1-1 1z"/></svg><span style="margin-left:8px">PIP Mode</span>`;
 ytproMainDiv.appendChild(ytproPIPVidElem);
 ytproPIPVidElem.addEventListener("click",
 function(){
@@ -2471,7 +2566,9 @@ ys.setAttribute("style",`width:50px;height:auto;position:relative;display:block;
 
 
 /*Download Button*/
-ysDown=document.createElement("div");
+// FIX #15: ysDown/ysHeart were implicit global variables (no var/let/const).
+// Any script on the page could accidentally read/overwrite them.
+var ysDown=document.createElement("div");
 ysDown.setAttribute("style",`
 height:48px;width:48px;display:flex;align-items:center;justify-content:center;
 filter:drop-shadow(0 0 1px #0009);
@@ -2487,7 +2584,7 @@ window.location.hash="download";
 
 
 /*Heart Button*/
-ysHeart=document.createElement("div");
+var ysHeart=document.createElement("div");
 ysHeart.setAttribute("style",`
 height:48px;width:48px;
 display:flex;align-items:center;justify-content:center;
@@ -2521,7 +2618,10 @@ document.getElementsByClassName("reel-player-overlay-actions")[0].insertBefore(y
 ys.appendChild(ysDown);
 ys.appendChild(ysHeart);
 }
-}catch{}
+// FIX #16: empty catch{} swallowed injection errors silently.
+// pkc() runs every 250ms (FIX #1) so injection will be retried automatically —
+// log the warning so devs can diagnose if the DOM structure changes.
+}catch(e){ console.warn('[YTPRO] Shorts button inject failed (will retry):', e && e.message); }
 
 }
 
@@ -2543,7 +2643,18 @@ ytoldV=window.location.pathname;
 }
 
 
-setInterval(pkc,0);
+// FIX #1: setInterval(pkc, 0) was a busy-loop (effectively every ms) causing
+// massive CPU/battery drain. async pkc() calls also overlapped each other because
+// setInterval doesn't wait for async completion — concurrent runs raced on shared DOM.
+// Fixed with: (a) 250ms interval, (b) a running-lock (_pkcRunning) so if one run
+// hasn't finished by the next tick it's simply skipped.
+var _pkcRunning = false;
+setInterval(async function(){
+  if(_pkcRunning) return;
+  _pkcRunning = true;
+  try{ await pkc(); }catch(e){ console.warn('[YTPRO] pkc error:', e); }
+  finally{ _pkcRunning = false; }
+}, 250);
 
 
 
@@ -2696,8 +2807,9 @@ title:ytplayer.config.args.raw_player_response?.videoDetails?.title.replaceAll("
 
 
 var g="16";
-var h=`<span style="margin-left:8px">Heart<span>`;
-(window.location.href.indexOf('youtube.com/shorts') > -1) ? h=``:h=`<span style="margin-left:8px">Heart<span>`;
+// FIX #14: unclosed <span> tags — second <span> should be </span>
+var h=`<span style="margin-left:8px">Heart</span>`;
+(window.location.href.indexOf('youtube.com/shorts') > -1) ? h=``:h=`<span style="margin-left:8px">Heart</span>`;
 (window.location.href.indexOf('youtube.com/shorts') > -1) ? g="24" : g="24" ;
 
 
@@ -2768,9 +2880,13 @@ v.style.objectFit = '';
 v.style.background = '';
 
 v.pause();
+// FIX #9: 5ms pause→play delay was too short — on many devices the pause event
+// hasn't even fired yet, so play() was called while the browser still thought
+// the video was playing → race condition producing a paused-but-should-play state.
+// 150ms is enough for the pause to settle before we resume.
 setTimeout(()=>{
-v.play();
-},5);
+if(v.paused) v.play().catch(()=>{});
+}, 150);
 
 
 }
@@ -2781,6 +2897,10 @@ v.play();
 function PIPlayer(pip = false){
   
 var v=document.getElementsByClassName('video-stream')[0];
+// FIX #10: no null check — if called before the video element is in the DOM
+// (e.g. on a non-video page or while the player is still loading) the code would
+// throw on v.getBoundingClientRect() / v.requestFullscreen() / v.play().
+if(!v) return;
 
  
 if(pip){
@@ -2847,7 +2967,16 @@ isPIP=true;
 // to allow the pip mode for the video element , like chromium browsers
 
 HTMLMediaElement.prototype.pause = function(){
-  
+// FIX #13: was overriding pause() on ALL media elements globally.
+// Ad players, background audio, WebRTC streams, etc. were all blocked from
+// pausing, causing broken ads (visible UI hang), WebRTC issues, and subtle
+// third-party player bugs. Only the primary YouTube .video-stream element
+// should be intercepted during PIP mode.
+var ytVideo = document.getElementsByClassName('video-stream')[0];
+if(this !== ytVideo){
+  return originalPause.apply(this, arguments);
+}
+
 if (pauseAllowed || PIPause) {
 return originalPause.apply(this, arguments);
 }
@@ -2877,6 +3006,10 @@ document.exitFullscreen = function (...args) {
 //request full screen
 Element.prototype.requestFullscreen = function (...args) {
 var video = document.getElementsByClassName('video-stream')[0];
+// FIX #12: no null check — crashes when requestFullscreen is called before
+// the .video-stream element exists (e.g. during initial page load, on
+// non-video pages, or inside a WebWorker context).
+if(!video) return originalRequestFullscreen.apply(this, args);
 
 if(video.getBoundingClientRect().height > video.getBoundingClientRect().width){
 Android.fullScreen(true);
@@ -3199,8 +3332,14 @@ el.appendChild(elm);
 const targetNode = document.body;
 const config = { childList: true, subtree: true };
 
+var ytproObserverPending = false;
 const observer = new MutationObserver(() => {
 
+if(ytproObserverPending) return;
+ytproObserverPending = true;
+
+requestAnimationFrame(() => {
+ytproObserverPending = false;
 
 //speed
 
@@ -3226,6 +3365,8 @@ else{
 Android.fullScreen(false);
 }}
 catch{}
+
+});
 
 
 });

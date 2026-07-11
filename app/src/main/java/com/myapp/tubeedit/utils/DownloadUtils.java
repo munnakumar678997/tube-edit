@@ -42,15 +42,18 @@ public class DownloadUtils {
                    .setMimeType(mtype)
                    .setAllowedOverMetered(true)
                    .setAllowedOverRoaming(true)
-                   .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, safeFileName)
+                   // Save alongside muxed/extracted files (Downloads/YTPRO) instead of the
+                   // Downloads root, so everything the app downloads lives in one place.
+                   .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS + "/YTPRO", safeFileName)
                    .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
                    
             downloadManager.enqueue(request);
-            Toast.makeText(activity, activity.getString(R.string.dl_started), Toast.LENGTH_SHORT).show();
+            activity.runOnUiThread(() -> Toast.makeText(activity, activity.getString(R.string.dl_started), Toast.LENGTH_SHORT).show());
         } catch (Exception e) {
             // FIX #21 (implicit): show the actual error so the user knows the download failed,
             // rather than silently swallowing it.
-            Toast.makeText(activity, "Download failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            final String msg = e.getMessage();
+            activity.runOnUiThread(() -> Toast.makeText(activity, "Download failed: " + msg, Toast.LENGTH_SHORT).show());
         }
     }
 

@@ -15,7 +15,7 @@ var script = document.createElement('script'); script.src="//youtube.com/ytpro_c
 if(!YTProVer){
 
 /*Few Stupid Inits*/
-var YTProVer="1.0.0";
+var YTProVer="1.0.2";
 var ytoldV="";
 var isF=false;   //what is this for?
 var isAp=false; // oh it's for bg play 
@@ -490,11 +490,17 @@ checkSponsors(window.location.href);
 
 function ytproOnVideoPageLoad(){
 
+var unVAttempts = 0;
 var unV=setInterval(() => {
+
+unVAttempts++;
 
 /*Unmute The Video*/ 
 var vEl = document.getElementsByClassName('video-stream')[0];
-if(!vEl){ return; }
+if(!vEl){
+if(unVAttempts > 100){ clearInterval(unV); } // safety cap: ~10s of retrying, avoid an infinite leaked interval
+return;
+}
 vEl.muted=false;
 vEl.loop = localStorage.getItem("loopVid") === "true";
 
@@ -507,11 +513,11 @@ var bannerBox = unmuteBanner.closest('button, [role="button"], div') || unmuteBa
 bannerBox.style.display = 'none';
 }
 
-if(!vEl.muted){
+if(!vEl.muted || unVAttempts > 100){
 clearInterval(unV);
 }
 
-}, 5);
+}, 100);
 
 setTimeout(()=>{
 var unmuteBanner2 = ytproFindByText(document.body, "TAP TO UNMUTE");
@@ -1192,6 +1198,13 @@ function ytproFormatDuration(sec){
   return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
+function ytproEscapeHtml(str){
+if(!str) return "";
+var div = document.createElement("div");
+div.textContent = str;
+return div.innerHTML;
+}
+
 function renderDownloadHistory(){
   var list = ytpSetI.querySelector("#ytproDownloadHistoryList");
   if(!list) return;
@@ -1211,7 +1224,7 @@ function renderDownloadHistory(){
         ${item.duration ? `<span style="position:absolute;bottom:3px;right:3px;background:rgba(0,0,0,.8);color:#fff;font-size:9px;padding:1px 4px;border-radius:3px;">${ytproFormatDuration(item.duration)}</span>` : ""}
       </div>
       <div data-hist-open="${idx}" style="flex:1;margin-left:10px;overflow:hidden;">
-        <div style="font-size:13px;font-weight:bold;color:${isD ? "#fff" : "#111"};display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.3;">${item.title}</div>
+        <div style="font-size:13px;font-weight:bold;color:${isD ? "#fff" : "#111"};display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.3;">${ytproEscapeHtml(item.title)}</div>
         <div style="font-size:11px;color:${isD ? "#aaa" : "#666"};margin-top:4px;">${typeLabel[item.type] || item.type} · ${ytproTimeAgo(item.date)}</div>
       </div>
       <div data-hist-menu="${idx}" style="flex-shrink:0;padding:6px;font-size:16px;color:${isD ? "#ccc" : "#444"};">⋮</div>
@@ -3319,8 +3332,14 @@ el.appendChild(elm);
 const targetNode = document.body;
 const config = { childList: true, subtree: true };
 
+var ytproObserverPending = false;
 const observer = new MutationObserver(() => {
 
+if(ytproObserverPending) return;
+ytproObserverPending = true;
+
+requestAnimationFrame(() => {
+ytproObserverPending = false;
 
 //speed
 
@@ -3346,6 +3365,8 @@ else{
 Android.fullScreen(false);
 }}
 catch{}
+
+});
 
 
 });

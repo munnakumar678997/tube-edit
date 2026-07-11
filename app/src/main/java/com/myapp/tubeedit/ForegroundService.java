@@ -101,8 +101,13 @@ public class ForegroundService extends Service {
 
         Context cont = getApplicationContext();
 
-        byte[] decodedBytes = Base64.decode(icon, Base64.DEFAULT);
-        Bitmap largeIcon = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.length);
+        Bitmap largeIcon;
+        try {
+            byte[] decodedBytes = Base64.decode(icon, Base64.DEFAULT);
+            largeIcon = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.length);
+        } catch (Exception e) {
+            largeIcon = null;
+        }
 
         int playbackState;
         if ("pause".equals(action)) {
@@ -164,7 +169,9 @@ public class ForegroundService extends Service {
                     .addAction(R.drawable.ic_skip_next_white, "Next", nextPendingIntent);
         }
 
-        notificationManager.notify(1, builder.build());
+        if (notificationManager != null) {
+            notificationManager.notify(1, builder.build());
+        }
     }
 
 
@@ -221,8 +228,13 @@ public class ForegroundService extends Service {
         String subtitle = intent.getStringExtra("subtitle");
         String icon = intent.getStringExtra("icon");
 
-        byte[] decodedBytes = Base64.decode(icon, Base64.DEFAULT);
-        Bitmap largeIcon = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.length);
+        Bitmap largeIcon;
+        try {
+            byte[] decodedBytes = Base64.decode(icon, Base64.DEFAULT);
+            largeIcon = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.length);
+        } catch (Exception e) {
+            largeIcon = null;
+        }
 
         Intent openAppIntent = new Intent(this, MainActivity.class);
         openAppIntent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);

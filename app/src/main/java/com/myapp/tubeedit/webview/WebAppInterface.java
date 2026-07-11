@@ -70,7 +70,7 @@ public class WebAppInterface {
 	
 	@JavascriptInterface
 	public void showToast(String txt) {
-		Toast.makeText(activity.getApplicationContext(), txt, Toast.LENGTH_SHORT).show();
+		activity.runOnUiThread(() -> Toast.makeText(activity.getApplicationContext(), txt, Toast.LENGTH_SHORT).show());
 	}
 	
 	@JavascriptInterface
@@ -323,14 +323,16 @@ public class WebAppInterface {
 	@JavascriptInterface
 	public void pipvid(String mode) {
 		if (android.os.Build.VERSION.SDK_INT >= 26) {
-			try {
-				PictureInPictureParams params = new PictureInPictureParams.Builder()
-				.setAspectRatio(new Rational(mode.equals("portrait") ? 9 : 16, mode.equals("portrait") ? 16 : 9))
-				.build();
-				activity.enterPictureInPictureMode(params);
-			} catch (Exception e) { e.printStackTrace(); }
+			activity.runOnUiThread(() -> {
+				try {
+					PictureInPictureParams params = new PictureInPictureParams.Builder()
+					.setAspectRatio(new Rational(mode.equals("portrait") ? 9 : 16, mode.equals("portrait") ? 16 : 9))
+					.build();
+					activity.enterPictureInPictureMode(params);
+				} catch (Exception e) { e.printStackTrace(); }
+			});
 		} else {
-			Toast.makeText(activity, activity.getString(R.string.no_pip), Toast.LENGTH_SHORT).show();
+			activity.runOnUiThread(() -> Toast.makeText(activity, activity.getString(R.string.no_pip), Toast.LENGTH_SHORT).show());
 		}
 	}
 
