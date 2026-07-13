@@ -16,6 +16,7 @@ import android.media.session.MediaSession;
 import android.media.session.PlaybackState;
 import android.os.Build;
 import android.os.IBinder;
+import android.os.PowerManager;
 import android.util.Base64;
 import android.util.Log;
 
@@ -28,6 +29,11 @@ public class ForegroundService extends Service {
     private NotificationManager notificationManager;
     private BroadcastReceiver updateReceiver;
     private MediaSession mediaSession;
+    // Without this, the CPU/JS engine gets throttled by Android's Doze mode once the
+    // screen turns off, so a video ending doesn't reliably trigger the "play next"
+    // logic until the screen is turned back on. A partial wake lock keeps just the
+    // CPU (not the screen) awake while something is actively playing.
+    private PowerManager.WakeLock wakeLock;
 
     @Override
     public void onCreate() {
@@ -112,8 +118,10 @@ public class ForegroundService extends Service {
         int playbackState;
         if ("pause".equals(action)) {
             playbackState = PlaybackState.STATE_PAUSED;
+            releaseWakeLock();
         } else if ("play".equals(action)) {
             playbackState = PlaybackState.STATE_PLAYING;
+            acquireWakeLock();
         } else {
             playbackState = PlaybackState.STATE_BUFFERING;
         }
@@ -218,8 +226,10 @@ public class ForegroundService extends Service {
         int playbackState;
         if ("pause".equals(action)) {
             playbackState = PlaybackState.STATE_PAUSED;
+            releaseWakeLock();
         } else if ("play".equals(action)) {
             playbackState = PlaybackState.STATE_PLAYING;
+            acquireWakeLock();
         } else {
             playbackState = PlaybackState.STATE_BUFFERING;
         }
@@ -315,9 +325,34 @@ public class ForegroundService extends Service {
     // FIX #28: MediaSession was never released/deactivated on service destroy.
     // This caused a "leaked" MediaSession that could interfere with subsequent
     // playback sessions and consume system resources.
+    private void acquireWakeLock() {
+        try {
+            if (wakeLock == null) {
+                PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+                wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "TubeEdit::PlaybackWakeLock");
+                wakeLock.setReferenceCounted(false);
+            }
+            if (!wakeLock.isHeld()) {
+                // Safety timeout so a wake lock can never be accidentally held forever
+                // (e.g. if a "pause" update is ever missed) — 10 hours covers even a
+                // very long playlist/podcast session.
+                wakeLock.acquire(10 * 60 * 60 * 1000L);
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private void releaseWakeLock() {
+        try {
+            if (wakeLock != null && wakeLock.isHeld()) {
+                wakeLock.release();
+            }
+        } catch (Exception ignored) {}
+    }
+
     @Override
     public void onDestroy() {
         super.onDestroy();
+        releaseWakeLock();
         if (updateReceiver != null) {
             try {
                 unregisterReceiver(updateReceiver);
